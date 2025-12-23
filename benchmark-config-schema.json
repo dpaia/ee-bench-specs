@@ -1,0 +1,2143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/dpaia/ee-bench/schemas/benchmark-config.json",
+  "title": "EE-Bench Benchmark Configuration Schema",
+  "description": "Schema for EE-Bench YAML configuration files that define complete evaluation specifications",
+  "type": "object",
+  "required": ["version", "spec", "dataset"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version for future compatibility",
+      "const": "1.0"
+    },
+    "spec": {
+      "type": "string",
+      "description": "Evaluation specification type to use (e.g., 'jvm', 'python')",
+      "examples": ["jvm", "python"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable name for this configuration"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of what this evaluation does"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Tags for categorization and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about this configuration",
+      "properties": {
+        "author": {
+          "type": "string",
+          "description": "Who created this configuration"
+        },
+        "created": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this configuration was created"
+        },
+        "tags": {
+          "type": "array",
+          "description": "Tags for categorization",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "agents": {
+      "type": "array",
+      "description": "Agent configurations for evaluation tasks. Multiple agents can be configured; the first or primary-marked agent is used for predictions.",
+      "items": {
+        "$ref": "#/definitions/AgentConfiguration"
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "description": "Prediction source configurations. Predictions can come from files, agents, or instance fields.",
+      "items": {
+        "$ref": "#/definitions/PredictionConfiguration"
+      }
+    },
+    "dataset": {
+      "$ref": "#/definitions/DatasetConfiguration",
+      "description": "Dataset configuration specifying which instances to evaluate"
+    },
+    "environment": {
+      "$ref": "#/definitions/EnvironmentConfiguration",
+      "description": "Environment setup configuration including configurers and sandbox settings"
+    },
+    "evaluations": {
+      "type": "array",
+      "description": "List of evaluation configurations. Supports multiple evaluation pipelines with different evaluators, scoring, and output settings.\n\nUse cases:\n- Run separate evaluations for gold patches vs agent-generated patches\n- Compare different evaluator configurations (e.g., with/without security scanning)\n- Generate multiple reports with different scoring methods\n\nEach evaluation creates its own EvaluationRunner with independent:\n- Evaluator pipeline (get_evaluators() instantiates from registry)\n- Report manager (get_report_manager() creates per-evaluation)\n- Output configuration (separate report files)\n\nExamples:\n- Single evaluation: Run tests and measure correctness\n- Dual evaluation: Compare gold patch vs agent patch performance\n- Multi evaluation: Test with different timeout/retry configurations",
+      "items": {
+        "$ref": "#/definitions/EvaluationConfiguration"
+      },
+      "examples": [
+        [
+          {
+            "id": "gold-eval",
+            "name": "Gold Patch Evaluation",
+            "evaluators": [
+              {"name": "project_reset", "type": "project_reset"},
+              {"name": "test_runner", "type": "test_runner", "options": {"tests": "*"}}
+            ]
+          }
+        ],
+        [
+          {
+            "id": "gold-eval",
+            "name": "Gold Patch Evaluation",
+            "evaluators": [{"name": "test_runner", "type": "test_runner"}]
+          },
+          {
+            "id": "agent-eval",
+            "name": "Agent Patch Evaluation",
+            "evaluators": [
+              {"name": "test_runner", "type": "test_runner"},
+              {"name": "regression_detection", "type": "regression_detection"}
+            ],
+            "timeout": 3600
+          }
+        ]
+      ]
+    },
+    "log": {
+      "$ref": "#/definitions/LogConfiguration",
+      "description": "Logging configuration"
+    },
+    "options": {
+      "$ref": "#/definitions/OptionsConfiguration",
+      "description": "Advanced options for caching, concurrency, validation, and debugging"
+    },
+    "params": {
+      "type": "object",
+      "description": "Runtime parameters passed via CLI for backward compatibility with kwargs",
+      "additionalProperties": true
+    }
+  },
+  "definitions": {
+    "AgentConfiguration": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Agent name (e.g., 'junie-idea', 'claude-code')"
+        },
+        "version": {
+          "type": "string",
+          "description": "Specific agent version. Supports environment variable substitution."
+        },
+        "primary": {
+          "type": "boolean",
+          "description": "Mark as primary agent. If not specified, first agent is primary.",
+          "default": false
+        },
+        "description": {
+          "type": "string",
+          "description": "Agent description"
+        },
+        "agent_type": {
+          "type": "string",
+          "description": "Agent type identifier"
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Agent execution timeout in seconds"
+        },
+        "options": {
+          "type": "object",
+          "description": "Agent-specific options passed as kwargs. Supports nested structures and environment variables. For IDE agents, see PrerequisiteConfiguration.options for common IDE-specific options.",
+          "properties": {
+            "model": {
+              "type": "string",
+              "description": "LLM model to use (supports env vars: ${MODEL})"
+            },
+            "temperature": {
+              "type": "number",
+              "description": "Model temperature for LLM agents"
+            },
+            "api_key": {
+              "type": "string",
+              "description": "API key for agent (use env vars: ${API_KEY})"
+            },
+            "timeout": {
+              "type": "integer",
+              "description": "Agent-specific timeout"
+            },
+            "max_retries": {
+              "type": "integer",
+              "description": "Maximum retry attempts"
+            },
+            "download_url": {
+              "type": "string",
+              "description": "Custom download URL for IDE agents (plain URL without authentication)",
+              "format": "uri"
+            },
+            "curl": {
+              "type": "string",
+              "description": "Curl command for authenticated IDE downloads (takes precedence over download_url)"
+            },
+            "plugins": {
+              "type": "array",
+              "description": "IDE plugins to install (for IDE agents only)",
+              "items": {
+                "oneOf": [
+                  {"type": "string"},
+                  {"type": "object"}
+                ]
+              }
+            },
+            "telemetry": {
+              "type": "object",
+              "description": "DEPRECATED: Use features.telemetry instead. OpenTelemetry configuration for agent telemetry.",
+              "deprecated": true,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable telemetry export",
+                  "default": false
+                },
+                "bridge": {
+                  "type": "boolean",
+                  "description": "Start telemetry bridge",
+                  "default": false
+                },
+                "endpoint": {
+                  "type": "string",
+                  "description": "OTLP endpoint URL",
+                  "format": "uri"
+                },
+                "protocol": {
+                  "type": "string",
+                  "description": "OTLP protocol",
+                  "enum": ["http/json", "http/protobuf", "grpc"],
+                  "default": "http/json"
+                },
+                "log_prompts": {
+                  "type": "boolean",
+                  "description": "Enable prompt logging",
+                  "default": false
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": true
+        },
+        "entry_command_alias": {
+          "type": "string",
+          "description": "Alias/wrapper name for entry command (e.g., 'claude-code', 'junie'). Used to reference the agent in shell scripts and commands."
+        },
+        "install_command": {
+          "$ref": "#/definitions/ScriptConfiguration",
+          "description": "Script for installing the agent. Supports inline commands, type aliases (shell, bash, python, etc.), or full script specification with files."
+        },
+        "version_command": {
+          "$ref": "#/definitions/ScriptConfiguration",
+          "description": "Script for checking agent version. Supports inline commands, type aliases, or full script specification."
+        },
+        "entry_command": {
+          "$ref": "#/definitions/ScriptConfiguration",
+          "description": "Script for running the agent. Supports inline commands, type aliases, or full script specification."
+        },
+        "env": {
+          "type": "object",
+          "description": "Agent-level environment variables. Merged with prediction-level env vars (prediction overrides agent).",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "features": {
+          "type": "object",
+          "description": "Agent features configuration. Each feature can have its own configuration structure. Features include MCP (tool integration), telemetry (observability), and more.",
+          "properties": {
+            "mcp": {
+              "description": "Model Context Protocol (MCP) configuration for tool integration",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "description": "MCP configuration with tools_path",
+                  "properties": {
+                    "tools_path": {
+                      "type": "string",
+                      "description": "Path to MCP tools configuration file (JSON). Supports environment variables."
+                    }
+                  },
+                  "required": ["tools_path"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "description": "MCP configuration with inline tools",
+                  "properties": {
+                    "tools": {
+                      "description": "Inline MCP tools configuration (array of tool definitions or dict with tools)",
+                      "oneOf": [
+                        {
+                          "type": "array",
+                          "description": "Array of MCP tool definitions",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "description": "Dictionary with MCP tools configuration"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["tools"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "description": "MCP configuration with servers",
+                  "properties": {
+                    "servers": {
+                      "type": "object",
+                      "description": "MCP servers configuration (key: server name, value: server config)",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "description": "Server type (e.g., 'sse', 'stdio')",
+                            "examples": ["sse", "stdio"]
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "Server URL for SSE type",
+                            "format": "uri"
+                          },
+                          "command": {
+                            "type": "string",
+                            "description": "Command to run for stdio type"
+                          },
+                          "args": {
+                            "type": "array",
+                            "description": "Arguments for stdio command",
+                            "items": {"type": "string"}
+                          },
+                          "headers": {
+                            "type": "object",
+                            "description": "HTTP headers for SSE type",
+                            "additionalProperties": {"type": "string"}
+                          },
+                          "env": {
+                            "type": "object",
+                            "description": "Environment variables for the server",
+                            "additionalProperties": {"type": "string"}
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": ["servers"],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "telemetry": {
+              "type": "object",
+              "description": "OpenTelemetry configuration for agent telemetry. Configures OTLP export settings and langfuse bridge integration.",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable telemetry export (sets CLAUDE_CODE_ENABLE_TELEMETRY=1 for Claude Code)",
+                  "default": false
+                },
+                "bridge": {
+                  "type": "boolean",
+                  "description": "Start telemetry bridge (sets CLAUDE_TELEMETRY_BRIDGE=1). When enabled, langfuse-telemetry-bridge will be started automatically. Configures: Agent -> Bridge -> Collector",
+                  "default": false
+                },
+                "endpoint": {
+                  "type": "string",
+                  "description": "OTLP endpoint URL. With bridge: sets OTLP_EXPORT_ENDPOINT (bridge forwards here). Without bridge: sets OTEL_EXPORTER_OTLP_ENDPOINT (agent exports directly). Supports environment variable substitution.",
+                  "format": "uri",
+                  "examples": ["http://localhost:4317", "http://localhost:4318", "${OTEL_ENDPOINT}"]
+                },
+                "protocol": {
+                  "type": "string",
+                  "description": "OTLP protocol. With bridge: sets OTLP_EXPORT_PROTOCOL (bridge -> collector). Without bridge: sets OTEL_EXPORTER_OTLP_PROTOCOL (agent -> collector)",
+                  "enum": ["http/json", "http/protobuf", "grpc"],
+                  "default": "http/json"
+                },
+                "bridge_port": {
+                  "type": ["string", "integer"],
+                  "description": "Bridge listening port (default: 4318)",
+                  "default": "4318"
+                },
+                "log_prompts": {
+                  "type": "boolean",
+                  "description": "Enable prompt logging (sets OTEL_LOG_USER_PROMPTS=1). Disabled by default for privacy.",
+                  "default": false
+                }
+              },
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "enabled": true,
+                  "bridge": true,
+                  "endpoint": "http://localhost:4317",
+                  "protocol": "grpc"
+                },
+                {
+                  "enabled": true,
+                  "bridge": false,
+                  "endpoint": "http://localhost:4318",
+                  "protocol": "http/json"
+                }
+              ]
+            },
+            "prompt_config": {
+              "type": "object",
+              "description": "System prompt and role configuration for agents that implement the SupportsPromptConfig protocol. Only agents like Claude Code that support this feature will receive the configuration; non-supporting agents silently ignore it.",
+              "properties": {
+                "system_prompt": {
+                  "type": "string",
+                  "description": "System prompt for the agent. Provides context and instructions for LLM-based agents. Supports environment variable substitution.",
+                  "examples": [
+                    "You are a senior software engineer...",
+                    "Focus on writing clean, maintainable code...",
+                    "${CUSTOM_SYSTEM_PROMPT}"
+                  ]
+                },
+                "role": {
+                  "type": "string",
+                  "description": "Agent role (e.g., 'developer', 'reviewer', 'architect'). Used to contextualize the agent's behavior.",
+                  "examples": ["developer", "reviewer", "architect", "debugger"]
+                }
+              },
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "system_prompt": "You are a senior software engineer focusing on code quality.",
+                  "role": "developer"
+                },
+                {
+                  "system_prompt": "Review code for security vulnerabilities and best practices.",
+                  "role": "reviewer"
+                }
+              ]
+            },
+            "acp": {
+              "type": "object",
+              "description": "Agent Client Protocol (ACP) configuration for running ACP-compliant agents. When enabled, the framework wraps the agent's entry command with acp-client-wrapper which handles JSON-RPC 2.0 communication over stdio. The wrapper implements client methods (fs/*, terminal/*) directly on the sandbox filesystem.",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable ACP protocol support for this agent. When true, acp-client-wrapper is added as a dependency and entry command is wrapped.",
+                  "default": false
+                },
+                "timeout": {
+                  "type": "integer",
+                  "description": "Session timeout in seconds. The ACP wrapper will terminate the session if the agent doesn't respond within this time.",
+                  "default": 3600,
+                  "minimum": 1,
+                  "examples": [1800, 3600, 7200]
+                },
+                "auto_approve": {
+                  "type": "boolean",
+                  "description": "Auto-approve permission requests from the agent. For benchmarking, this should typically be true. When false, the wrapper would prompt for approval (not yet implemented).",
+                  "default": true
+                },
+                "capabilities": {
+                  "type": "array",
+                  "description": "List of ACP capabilities to advertise to the agent during initialization. These define what operations the client (wrapper) supports.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": ["fs.readTextFile", "fs.writeTextFile", "terminal.create"],
+                  "examples": [
+                    ["fs.readTextFile", "fs.writeTextFile", "terminal.create"],
+                    ["fs.readTextFile", "fs.writeTextFile", "terminal.create", "terminal.execute"]
+                  ]
+                }
+              },
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "enabled": true
+                },
+                {
+                  "enabled": true,
+                  "timeout": 7200,
+                  "auto_approve": true
+                },
+                {
+                  "enabled": true,
+                  "timeout": 3600,
+                  "auto_approve": true,
+                  "capabilities": ["fs.readTextFile", "fs.writeTextFile", "terminal.create"]
+                }
+              ]
+            }
+          },
+          "additionalProperties": true
+        },
+        "dependencies": {
+          "type": "array",
+          "description": "List of agent dependencies. Each dependency can be a simple string, a PrerequisiteConfiguration object, or a nested AgentConfiguration.",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Simple dependency reference (e.g., 'claude-code:latest', 'idea-mcp-server:252')"
+              },
+              {
+                "$ref": "#/definitions/PrerequisiteConfiguration",
+                "description": "Full prerequisite configuration with options and scripts"
+              },
+              {
+                "$ref": "#/definitions/AgentConfiguration",
+                "description": "Nested agent configuration as a dependency"
+              }
+            ]
+          },
+          "examples": [
+            ["claude-code:latest", "node:18"],
+            [
+              {"name": "idea-mcp-server", "version": "252", "options": {"ultimate": true}},
+              {"name": "node", "version": "18"}
+            ]
+          ]
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional agent metadata (author, created date, custom fields)",
+          "additionalProperties": true
+        }
+      }
+    },
+    "PrerequisiteConfiguration": {
+      "type": "object",
+      "required": ["name"],
+      "description": "Prerequisite configuration for agent dependencies. Used to declare and configure prerequisites with metadata overrides.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Prerequisite name (e.g., 'idea-mcp-server', 'node', 'docker')"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version specification (e.g., '252', 'latest', '18.x')"
+        },
+        "description": {
+          "type": "string",
+          "description": "Prerequisite description override"
+        },
+        "options": {
+          "type": "object",
+          "description": "Prerequisite-specific options. For IDE prerequisites, common options include edition, download sources (download_url, curl, download_path), project_warmup, plugins, args, and properties.",
+          "properties": {
+            "edition": {
+              "type": "string",
+              "description": "IDE edition (e.g., 'ultimate', 'community')",
+              "examples": ["ultimate", "community"]
+            },
+            "download_url": {
+              "type": "string",
+              "description": "Custom download URL for direct downloads (plain URL without authentication)",
+              "format": "uri",
+              "examples": ["https://download.jetbrains.com/idea/ideaIU-2024.1.tar.gz"]
+            },
+            "curl": {
+              "type": "string",
+              "description": "Curl command for authenticated downloads. Takes precedence over download_url. Supports headers, authentication, cookies, and all curl options.",
+              "examples": [
+                "curl -H 'Authorization: Bearer ${TOKEN}' https://private-server.com/ide.tar.gz",
+                "curl -u ${USERNAME}:${PASSWORD} https://protected.example.com/ide.tar.gz",
+                "curl -H 'X-API-Key: abc123' https://api.example.com/download/ide.tar.gz"
+              ]
+            },
+            "download_path": {
+              "type": "string",
+              "description": "Local file path for IDE installation package",
+              "examples": ["/path/to/local/ide.tar.gz"]
+            },
+            "project_warmup": {
+              "type": "boolean",
+              "description": "Enable IDE project warmup (pre-index project files)",
+              "default": false
+            },
+            "plugins": {
+              "type": "array",
+              "description": "List of IDE plugins to install",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "description": "Simple plugin ID or plugin:version format",
+                    "examples": ["markdown", "mcp-server:252"]
+                  },
+                  {
+                    "type": "object",
+                    "description": "Detailed plugin configuration",
+                    "required": ["plugin_id"],
+                    "properties": {
+                      "plugin_id": {
+                        "type": "string",
+                        "description": "Plugin identifier"
+                      },
+                      "version": {
+                        "type": "string",
+                        "description": "Plugin version (default: 'latest')",
+                        "default": "latest"
+                      },
+                      "download_url": {
+                        "type": "string",
+                        "description": "Custom plugin download URL (plain URL)",
+                        "format": "uri"
+                      },
+                      "curl": {
+                        "type": "string",
+                        "description": "Curl command for authenticated plugin downloads (takes precedence over download_url)",
+                        "examples": [
+                          "curl -H 'X-API-Key: ${KEY}' https://plugins.example.com/plugin.zip"
+                        ]
+                      },
+                      "download_path": {
+                        "type": "string",
+                        "description": "Local file path to plugin zip file"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "args": {
+              "type": "array",
+              "description": "Additional command line arguments for IDE launcher",
+              "items": {
+                "type": "string"
+              },
+              "examples": [["-Xmx4g", "-Xms2g"]]
+            },
+            "properties": {
+              "type": "object",
+              "description": "IDE system properties (passed as -Dkey=value)",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "examples": [{"idea.config.path": "/custom/config"}]
+            }
+          },
+          "additionalProperties": true
+        },
+        "env": {
+          "type": "object",
+          "description": "Environment variables for the prerequisite",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "install_command": {
+          "$ref": "#/definitions/ScriptConfiguration",
+          "description": "Override installation script"
+        },
+        "version_command": {
+          "$ref": "#/definitions/ScriptConfiguration",
+          "description": "Override version detection script"
+        },
+        "check_command": {
+          "$ref": "#/definitions/ScriptConfiguration",
+          "description": "Override verification script"
+        },
+        "platforms": {
+          "type": "array",
+          "description": "List of supported platforms (e.g., ['linux', 'darwin', 'win32'])",
+          "items": {
+            "type": "string"
+          }
+        },
+        "install_once": {
+          "type": "boolean",
+          "description": "Whether to install only once (default: true)",
+          "default": true
+        }
+      }
+    },
+    "PredictionConfiguration": {
+      "type": "object",
+      "required": ["id", "name", "source"],
+      "description": "Prediction configuration using unified source architecture. Each prediction uses one of three source types (FilePredictionSource, AgentPredictionSource, or InstancePredictionSource) based on the 'source' field value.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique prediction identifier (e.g., 'gold', 'agent', 'file')"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable prediction name"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["file", "agent", "instance"],
+          "description": "Prediction source type determines which source implementation is used:\n- 'file': Uses FilePredictionSource - loads predictions from a file (requires 'file' property)\n- 'agent': Uses AgentPredictionSource - generates predictions with an agent (requires 'agent' property)\n- 'instance': Uses InstancePredictionSource - references dataset instance field (requires 'instance' property)"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Custom prompt template for agent-based predictions. Only applicable when source='agent'. Supports Jinja2 template syntax:\n- {{ instance.problem_statement }} - dataset instance fields\n- {{ instance.repo }} - repository name from instance\n- {{ env.VAR_NAME }} - environment variables\n- {{ param_name }} - runtime parameters from CLI or YAML params\n\nIf not provided, the collector uses its default prompt builder.",
+          "examples": [
+            "Fix the issue: {{ instance.problem_statement }}",
+            "Task: Fix the bug in {{ instance.repo }}.\n\nProblem:\n{{ instance.problem_statement }}\n\nMake minimal changes to fix the issue."
+          ]
+        },
+        "file": {
+          "type": "object",
+          "description": "FilePredictionSource configuration (required when source='file'). Specifies where to load predefined predictions from.",
+          "required": ["type", "format"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["file", "uri"],
+              "description": "Source type: 'file' for local files, 'uri' for remote resources"
+            },
+            "format": {
+              "type": "string",
+              "enum": ["json", "yaml"],
+              "description": "Prediction file format"
+            },
+            "path": {
+              "type": "string",
+              "description": "Path to local prediction file. Supports environment variables."
+            },
+            "uri": {
+              "type": "string",
+              "format": "uri",
+              "description": "URI to remote prediction resource"
+            }
+          }
+        },
+        "agent": {
+          "description": "AgentPredictionSource configuration (required when source='agent'). Specifies which agent to use for generating predictions. Can reference top-level agent by name (string) or provide full configuration with overrides (object).",
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Reference to agent name from top-level agents list"
+            },
+            {
+              "$ref": "#/definitions/AgentConfiguration",
+              "description": "Full agent configuration or overrides for top-level agent"
+            }
+          ]
+        },
+        "instance": {
+          "type": "string",
+          "description": "InstancePredictionSource configuration (required when source='instance'). Template string referencing a field from the dataset instance. Example: '{instance.patch}', '{instance.gold_solution}'"
+        },
+        "options": {
+          "type": "object",
+          "description": "Collector-specific configuration options. Passed to the prediction collector for customizing behavior.",
+          "additionalProperties": true
+        },
+        "env": {
+          "type": "object",
+          "description": "Prediction-level environment variables. Merged with agent-level env vars (prediction overrides agent).",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "output": {
+          "$ref": "#/definitions/OutputConfiguration",
+          "description": "Output configuration for saving generated predictions to file"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "file"
+              }
+            }
+          },
+          "then": {
+            "required": ["file"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "agent"
+              }
+            }
+          },
+          "then": {
+            "required": ["agent"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "instance"
+              }
+            }
+          },
+          "then": {
+            "required": ["instance"]
+          }
+        }
+      ]
+    },
+    "DatasetConfiguration": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "object",
+          "description": "Dataset source specification",
+          "required": ["type", "format"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["file", "uri"],
+              "description": "Source type: 'file' for local files, 'uri' for remote resources"
+            },
+            "format": {
+              "type": "string",
+              "enum": ["json", "yaml"],
+              "description": "Dataset format"
+            },
+            "path": {
+              "type": "string",
+              "description": "Path to local dataset file. Supports environment variables."
+            },
+            "uri": {
+              "type": "string",
+              "format": "uri",
+              "description": "URI to remote dataset resource"
+            }
+          }
+        },
+        "filters": {
+          "type": "object",
+          "description": "Dataset filtering criteria",
+          "properties": {
+            "instance_ids": {
+              "type": "array",
+              "description": "Specific instance IDs to evaluate",
+              "items": {
+                "type": "string"
+              }
+            },
+            "tags": {
+              "type": "array",
+              "description": "Filter by tags",
+              "items": {
+                "type": "string"
+              }
+            },
+            "build_system": {
+              "type": "array",
+              "description": "Filter by build system (e.g., ['maven', 'gradle'])",
+              "items": {
+                "type": "string"
+              }
+            },
+            "difficulty": {
+              "type": "string",
+              "enum": ["easy", "medium", "hard"],
+              "description": "Filter by difficulty level"
+            },
+            "language": {
+              "type": "string",
+              "description": "Filter by programming language"
+            }
+          }
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of instances to evaluate",
+          "minimum": 1
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Skip first N instances",
+          "minimum": 0
+        },
+        "random_sample": {
+          "type": "integer",
+          "description": "Random sample of N instances",
+          "minimum": 1
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Random seed for reproducibility"
+        },
+        "cache": {
+          "type": "boolean",
+          "description": "Cache remote datasets locally",
+          "default": false
+        },
+        "validate": {
+          "type": "boolean",
+          "description": "Validate dataset format",
+          "default": true
+        }
+      }
+    },
+    "EnvironmentConfiguration": {
+      "type": "object",
+      "properties": {
+        "config_path": {
+          "description": "FileSource for loading pre-configured environment file. Supports both legacy string format and new FileSource object format.",
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Legacy format: simple string path to config file"
+            },
+            {
+              "type": "object",
+              "description": "FileSource configuration for loading environment config",
+              "required": ["type", "format"],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["file", "uri"],
+                  "description": "Source type"
+                },
+                "format": {
+                  "type": "string",
+                  "enum": ["json", "yaml"],
+                  "description": "Config file format"
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Path to local config file"
+                },
+                "uri": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "URI to remote config resource"
+                }
+              }
+            }
+          ]
+        },
+        "base_image": {
+          "type": "string",
+          "description": "DEPRECATED - Use image.base instead. Base Docker image name. Supports templates like {instance.repo}.",
+          "examples": ["ubuntu:22.04", "python:3.11", "eclipse-temurin:{instance.jvm_version}"]
+        },
+        "workspace_dir": {
+          "type": "string",
+          "description": "Workspace directory path. Supports environment variables."
+        },
+        "project_dir": {
+          "type": "string",
+          "description": "Project directory path relative to workspace"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "DEPRECATED - Use image.namespace instead. Docker image namespace for organizing built images.",
+          "default": "ee-bench",
+          "examples": ["ee-bench", "my-org/evaluation", "benchmark"]
+        },
+        "configurers": {
+          "type": "array",
+          "description": "Environment configurers to execute in order",
+          "items": {
+            "$ref": "#/definitions/ConfigurerConfiguration"
+          }
+        },
+        "image": {
+          "description": "Environment-level Docker image configuration. Supports simple string format (base image only) or object format (full config).",
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Simple format: base Docker image name (e.g., 'ubuntu:22.04', 'eclipse-temurin:24-jdk'). Supports templates like {instance.jvm_version}.",
+              "examples": ["ubuntu:22.04", "python:3.11", "eclipse-temurin:{instance.jvm_version}"]
+            },
+            {
+              "type": "object",
+              "description": "Full format: object with base image and additional settings",
+              "properties": {
+                "base": {
+                  "type": "string",
+                  "description": "Base Docker image name (e.g., 'ubuntu:22.04', 'eclipse-temurin:24-jdk'). Supports templates like {instance.jvm_version}. This is the starting point for building evaluation environments.",
+                  "examples": ["ubuntu:22.04", "python:3.11", "eclipse-temurin:{instance.jvm_version}"]
+                },
+                "namespace": {
+                  "type": "string",
+                  "description": "Default Docker image namespace prefix for all configurers (e.g., 'dpaia', 'ee-bench'). Individual configurers can override this.",
+                  "default": "dpaia",
+                  "examples": ["dpaia", "ee-bench", "my-org"]
+                },
+                "force": {
+                  "type": "boolean",
+                  "description": "Force rebuild of all images in the environment",
+                  "default": false
+                }
+              }
+            }
+          ]
+        },
+        "force_rebuild": {
+          "type": "boolean",
+          "description": "DEPRECATED - Use image.force instead. Force rebuild of environments",
+          "default": false
+        },
+        "parallel": {
+          "type": "boolean",
+          "description": "Build environments in parallel",
+          "default": false
+        },
+        "max_workers": {
+          "type": "integer",
+          "description": "Number of parallel workers",
+          "minimum": 1
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Environment setup timeout in seconds",
+          "minimum": 1
+        },
+        "sandbox": {
+          "$ref": "#/definitions/SandboxConfiguration",
+          "description": "Sandbox configuration for environment isolation"
+        },
+        "output": {
+          "$ref": "#/definitions/OutputConfiguration",
+          "description": "Output configuration for environment config files"
+        }
+      }
+    },
+    "ConfigurerConfiguration": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Configurer identifier/name (used for referencing in config). For backward compatibility, also used as factory type if 'type' is not provided."
+        },
+        "type": {
+          "type": "string",
+          "description": "Configurer type/factory name (resolves to factory in plugin system). If not provided, falls back to 'name'.",
+          "enum": [
+            "jvm__base",
+            "jvm__build_system",
+            "jvm__maven",
+            "jvm__gradle",
+            "jvm__dependencies",
+            "jvm__maven_dependencies",
+            "jvm__gradle_dependencies",
+            "git_checkout",
+            "snyk",
+            "agents",
+            "docker_image",
+            "bash_command",
+            "docker_in_docker"
+          ]
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable/disable this configurer",
+          "default": true
+        },
+        "options": {
+          "type": "object",
+          "description": "Configurer-specific options. See 'Available Configurers' section below for details. Note: The framework automatically adds 'name' (identifier from YAML) and 'type' (factory type) to options before passing to the configurer factory.",
+          "additionalProperties": true
+        },
+        "env": {
+          "type": "object",
+          "description": "Environment variables for this configurer. Supports template values: {instance.X}, {$ENV_VAR}, {cli_arg}.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "image": {
+          "description": "Docker image configuration for sandbox configurers. Supports simple string format (image name only) or object format (full config).",
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Simple format: custom image name (e.g., 'my-image:latest', 'jdk:17')",
+              "examples": ["jdk:17", "maven:3.9", "custom-build:latest"]
+            },
+            {
+              "type": "object",
+              "description": "Full format: object with image name and additional settings",
+              "properties": {
+                "namespace": {
+                  "type": "string",
+                  "description": "Docker image namespace prefix (e.g., 'ee-bench', 'dpaia'). Used to organize and prefix image tags.",
+                  "default": "dpaia",
+                  "examples": ["ee-bench", "dpaia", "my-org"]
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Custom image name (without namespace prefix). If not specified, the configurer name is used.",
+                  "examples": ["jdk:17", "maven:3.9", "custom-build:latest"]
+                },
+                "force": {
+                  "type": "boolean",
+                  "description": "Force rebuild of images even if they exist",
+                  "default": false
+                },
+                "build": {
+                  "type": "boolean",
+                  "description": "Whether to build the Docker image from commands. When true, 'name' must be specified.",
+                  "default": false
+                }
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "const": "jdk"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "type": "object",
+                "description": "JDK base image configurer options",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "description": "JDK version to use. Supports templates like '{instance.jvm_version:24}' to use instance property with default fallback.",
+                    "examples": ["17", "21", "24", "{instance.jvm_version:24}"]
+                  },
+                  "distribution": {
+                    "type": "string",
+                    "description": "JDK distribution (e.g., 'temurin', 'openjdk')",
+                    "default": "temurin"
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Docker image namespace",
+                    "default": "ee-bench"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "enum": ["build_system", "maven", "gradle"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "type": "object",
+                "description": "Build system configurer options. Automatically selects Maven or Gradle configurer based on build_system value.",
+                "properties": {
+                  "build_system": {
+                    "type": "string",
+                    "description": "Build system type. Supports templates: {instance.build_system}. Factory will select appropriate Maven or Gradle configurer.",
+                    "examples": [
+                      "maven",
+                      "gradle",
+                      "{instance.build_system}",
+                      "{instance.build_system:maven}"
+                    ]
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Docker image namespace for built images",
+                    "default": "ee-bench"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "enum": ["dependencies", "maven_dependencies", "gradle_dependencies"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "type": "object",
+                "description": "Dependencies configurer options. Automatically selects Maven or Gradle dependencies resolver based on build_system value.",
+                "properties": {
+                  "build_system": {
+                    "type": "string",
+                    "description": "Build system type for dependency resolution. Supports templates: {instance.build_system}. Factory will select appropriate Maven or Gradle dependencies configurer.",
+                    "examples": [
+                      "maven",
+                      "gradle",
+                      "{instance.build_system}",
+                      "{instance.build_system:maven}"
+                    ]
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Docker image namespace for dependency images",
+                    "default": "ee-bench"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "const": "git_checkout"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "type": "object",
+                "description": "Git checkout configurer options for cloning repositories and checking out commits",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "Repository URL. Supports templates: {instance.repo}, {$ENV_VAR}, {cli_arg}. Example: 'https://github.com/{instance.repo}'",
+                    "examples": [
+                      "https://github.com/{instance.repo}",
+                      "https://{$GITHUB_TOKEN}@github.com/{instance.repo}",
+                      "https://gitlab.com/myorg/{instance.project}.git"
+                    ]
+                  },
+                  "base_commit": {
+                    "type": "string",
+                    "description": "Commit SHA to checkout. Supports templates: {instance.base_commit}, {instance.commit_hash}",
+                    "examples": [
+                      "{instance.base_commit}",
+                      "{instance.commit_hash}",
+                      "abc123def456"
+                    ]
+                  },
+                  "target_dir": {
+                    "type": "string",
+                    "description": "Target directory for cloned repository. Supports templates.",
+                    "default": "/workspace/task_project",
+                    "examples": [
+                      "/workspace/task_project",
+                      "/workspace/{instance.project_name}",
+                      "{workspace_dir}/project"
+                    ]
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Docker image namespace for built images",
+                    "default": "ee-bench"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "const": "snyk"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "type": "object",
+                "description": "Snyk environment configurer options",
+                "properties": {
+                  "install_method": {
+                    "type": "string",
+                    "enum": ["npm", "curl", "binary"],
+                    "description": "Snyk installation method",
+                    "default": "npm"
+                  },
+                  "verify_install": {
+                    "type": "boolean",
+                    "description": "Whether to verify Snyk installation",
+                    "default": "true"
+                  },
+                  "token": {
+                    "type": "string",
+                    "description": "Snyk API token for authentication. Use environment variables: ${SNYK_TOKEN}"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "const": "docker_agents"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "type": "object",
+                "description": "Docker agents environment configurer options",
+                "properties": {
+                  "agents": {
+                    "type": "array",
+                    "description": "Agent configurations to install in Docker environment. Can reference top-level agents by name, override their properties, or define new agents inline.",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "description": "Agent name referencing top-level agent (e.g., 'claude-code')"
+                        },
+                        {
+                          "type": "object",
+                          "description": "Agent configuration (overrides top-level or defines new agent)",
+                          "required": ["name"],
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "description": "Agent name"
+                            },
+                            "version": {
+                              "type": "string",
+                              "description": "Agent version override"
+                            },
+                            "timeout": {
+                              "type": "integer",
+                              "description": "Agent timeout override"
+                            },
+                            "env": {
+                              "type": "object",
+                              "description": "Agent-specific environment variables",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "additionalProperties": true
+                        }
+                      ]
+                    },
+                    "examples": [
+                      ["claude-code"],
+                      ["claude-code", "gemini"],
+                      [{"name": "claude-code", "timeout": 600}],
+                      ["claude-code", {"name": "gemini", "version": "2.0", "env": {"GEMINI_API_KEY": "${GEMINI_API_KEY}"}}]
+                    ]
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Docker image namespace for agent images",
+                    "default": "agents"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "const": "local_agents"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "type": "object",
+                "description": "Local agents environment configurer options. Validates agent availability on host system (does not install).",
+                "properties": {
+                  "agents": {
+                    "type": "array",
+                    "description": "Agent configurations to validate on local system. Can reference top-level agents by name, override their properties, or define new agents inline. Note: Agents must be pre-installed on the host.",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "description": "Agent name referencing top-level agent (e.g., 'claude-code')"
+                        },
+                        {
+                          "type": "object",
+                          "description": "Agent configuration (overrides top-level or defines new agent)",
+                          "required": ["name"],
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "description": "Agent name"
+                            },
+                            "version": {
+                              "type": "string",
+                              "description": "Agent version override"
+                            },
+                            "timeout": {
+                              "type": "integer",
+                              "description": "Agent timeout override"
+                            }
+                          },
+                          "additionalProperties": true
+                        }
+                      ]
+                    },
+                    "examples": [
+                      ["claude-code"],
+                      [{"name": "claude-code", "timeout": 600}]
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "const": "docker_in_docker"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "type": "object",
+                "description": "Docker-in-Docker (DinD) configurer options. Installs Docker CE inside the container, enabling testcontainers and other Docker-dependent tools without host socket mounting. Solves Docker Desktop API version mismatch issues on macOS.",
+                "properties": {
+                  "docker_version": {
+                    "type": "string",
+                    "description": "Docker version to install inside the container",
+                    "default": "latest",
+                    "examples": ["latest", "24.0", "25.0"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "SandboxConfiguration": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["docker", "local"],
+          "description": "Sandbox type",
+          "default": "docker"
+        },
+        "env": {
+          "type": "object",
+          "description": "Shared environment variables for all configurers. Supports template values.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "docker": {
+          "type": "object",
+          "description": "Docker sandbox configuration",
+          "properties": {
+            "registry": {
+              "type": "string",
+              "description": "Docker registry. Supports environment variables."
+            },
+            "privileged": {
+              "type": "boolean",
+              "description": "Run container in privileged mode",
+              "default": false
+            },
+            "cache": {
+              "type": "boolean",
+              "description": "Use Docker layer cache",
+              "default": true
+            },
+            "network": {
+              "type": "string",
+              "description": "Docker network to use"
+            },
+            "memory_limit": {
+              "type": "string",
+              "description": "Memory limit (e.g., '2g', '512m')"
+            },
+            "cpu_limit": {
+              "type": "string",
+              "description": "CPU limit (e.g., '2.0', '0.5')"
+            },
+            "shm_size": {
+              "type": "string",
+              "description": "Shared memory size (e.g., '1g')"
+            },
+            "volumes": {
+              "type": "array",
+              "description": "Volume mounts in format 'host:container:mode'",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "local": {
+          "type": "object",
+          "description": "Local sandbox configuration",
+          "properties": {
+            "working_dir": {
+              "type": "string",
+              "description": "Working directory path"
+            },
+            "env": {
+              "type": "object",
+              "description": "Local-specific environment variables",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "isolation_level": {
+              "type": "string",
+              "enum": ["none", "process", "container"],
+              "description": "Process isolation level",
+              "default": "process"
+            }
+          }
+        }
+      }
+    },
+    "EvaluationConfiguration": {
+      "type": "object",
+      "required": ["id"],
+      "description": "Evaluation configuration defining a complete evaluation pipeline.\n\nArchitecture:\n- Each evaluation creates a BaseEvaluationRunner instance per dataset instance\n- EvaluationRunner.get_evaluators() instantiates evaluators from registry using factories\n- EvaluationRunner.get_report_manager() creates independent report manager\n- Supports per-evaluation configuration: timeout, max_workers, scoring, output\n\nKey differences from legacy single-evaluation mode:\n- Multiple evaluations can run with different configurations\n- Each evaluation has independent report output\n- Evaluator options merged from YAML + CLI\n- Template resolution for instance-specific values",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this evaluation configuration (e.g., 'gold-patch-eval', 'agent-eval'). Used as default run_id and for report naming.",
+          "examples": ["gold-eval", "agent-eval", "baseline-eval", "security-scan"]
+        },
+        "run_id": {
+          "type": "string",
+          "description": "Optional execution run identifier (e.g., 'run-2024-01-15-10-30'). If not provided, defaults to id. Used for report generation and tracking.",
+          "examples": ["run-2024-01-15-10-30", "experiment-001", "gold-baseline"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Optional human-readable name for this evaluation displayed in logs and reports",
+          "examples": ["Gold Patch Evaluation", "Agent-Generated Solution Test", "Security Baseline"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of this evaluation's purpose and configuration",
+          "examples": [
+            "Evaluates gold patch correctness using all tests",
+            "Tests agent-generated patches with regression detection",
+            "Baseline evaluation without security scanning"
+          ]
+        },
+        "evaluators": {
+          "type": "array",
+          "description": "Evaluators to run in the evaluation pipeline",
+          "items": {
+            "$ref": "#/definitions/EvaluatorConfiguration"
+          }
+        },
+        "parallel": {
+          "type": "boolean",
+          "description": "Run evaluations in parallel",
+          "default": false
+        },
+        "max_workers": {
+          "type": "integer",
+          "description": "Number of parallel evaluator workers",
+          "minimum": 1
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Global evaluation timeout in seconds",
+          "minimum": 1
+        },
+        "fail_fast": {
+          "type": "boolean",
+          "description": "Stop evaluation on first failure",
+          "default": false
+        },
+        "cleanup": {
+          "type": "boolean",
+          "description": "Cleanup environment after evaluation (remove Docker containers, temporary files, etc.)",
+          "default": false
+        },
+        "scoring": {
+          "$ref": "#/definitions/ScoringConfiguration",
+          "description": "Scoring configuration"
+        },
+        "output": {
+          "$ref": "#/definitions/OutputConfiguration",
+          "description": "Output configuration for evaluation results"
+        },
+        "options": {
+          "type": "object",
+          "description": "Additional evaluation-specific options. Passed to evaluation runner for customizing behavior.",
+          "additionalProperties": true
+        },
+        "results_key": {
+          "type": "string",
+          "description": "Key to use when storing/reading evaluation results in report files. Useful for distinguishing multiple evaluation runs in the same report.",
+          "examples": ["gold_results", "agent_results", "baseline_results"]
+        }
+      }
+    },
+    "EvaluatorConfiguration": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Evaluator instance name (for referencing in pipeline)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Evaluator type/factory name",
+          "enum": [
+            "project_reset",
+            "jvm__test_runner",
+            "patch_application",
+            "prediction_application",
+            "regression_detection"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "description": "Evaluator description"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable/disable this evaluator",
+          "default": true
+        },
+        "is_terminal": {
+          "type": "boolean",
+          "description": "Mark as terminal evaluator (stops pipeline if fails)",
+          "default": false
+        },
+        "max_score": {
+          "type": "number",
+          "description": "Maximum score for this evaluator",
+          "minimum": 0
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Evaluator timeout in seconds",
+          "minimum": 1
+        },
+        "retry_count": {
+          "type": "integer",
+          "description": "Number of retries on failure",
+          "default": 0,
+          "minimum": 0
+        },
+        "retry_delay": {
+          "type": "integer",
+          "description": "Delay between retries in seconds",
+          "default": 0,
+          "minimum": 0
+        },
+        "continue_on_failure": {
+          "type": "boolean",
+          "description": "Continue evaluation chain if this evaluator fails",
+          "default": true
+        },
+        "dependencies": {
+          "type": "array",
+          "description": "List of evaluator names that must run before this one. Defines execution order in the evaluation pipeline.",
+          "items": {
+            "type": "string"
+          },
+          "examples": [["project_reset", "patch_application"], ["test_runner"]]
+        },
+        "is_async": {
+          "type": "boolean",
+          "description": "Whether evaluator runs asynchronously. Async evaluators can run in parallel with other evaluators.",
+          "default": false
+        },
+        "options": {
+          "type": "object",
+          "description": "Evaluator-specific options. Supports templates.",
+          "additionalProperties": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "test_runner"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "type": "object",
+                "description": "Test runner evaluator options",
+                "properties": {
+                  "tests": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "Test pattern or '*' for all tests. Supports templates like '{instance.fail_to_pass}'."
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "List of test patterns"
+                      }
+                    ]
+                  },
+                  "expect_pass": {
+                    "type": "boolean",
+                    "description": "Whether tests are expected to pass",
+                    "default": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "patch_application"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "type": "object",
+                "description": "Patch application evaluator options",
+                "properties": {
+                  "patch": {
+                    "type": "string",
+                    "description": "Patch content or template. Supports '{instance.test_patch}'."
+                  },
+                  "can_skip_patch": {
+                    "type": "boolean",
+                    "description": "Allow skipping if patch is empty",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ScoringConfiguration": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["sum", "weighted_sum", "average", "max", "min"],
+          "description": "Scoring aggregation method",
+          "default": "sum"
+        },
+        "weights": {
+          "type": "object",
+          "description": "Evaluator weights for weighted_sum method. Only evaluators listed in weights will be included in score calculation.",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "evaluators": {
+          "type": "array",
+          "description": "Optional list of evaluator names to include in score calculation (for sum/average methods). If not specified, all evaluators are included.",
+          "items": {
+            "type": "string"
+          },
+          "examples": [["test_runner", "regression_detection"], ["patch_application"]]
+        },
+        "normalize": {
+          "description": "Optional normalization value. If provided (e.g., 1.0, 100.0), scores will be normalized to this maximum value. If null, no normalization is applied. For backward compatibility, also accepts boolean: true means normalize to 1.0, false means no normalization.",
+          "oneOf": [
+            {
+              "type": "number",
+              "description": "Normalization maximum value (e.g., 1.0 for 0-1 range, 100.0 for 0-100 range)",
+              "minimum": 0,
+              "examples": [1.0, 100.0, 10.0]
+            },
+            {
+              "type": "boolean",
+              "description": "Backward compatibility: true = normalize to 1.0, false = no normalization"
+            },
+            {
+              "type": "null",
+              "description": "No normalization"
+            }
+          ],
+          "default": null
+        },
+        "min_score": {
+          "type": "number",
+          "description": "Minimum required score to pass",
+          "minimum": 0
+        },
+        "aggregation": {
+          "type": "string",
+          "enum": ["sum", "mean", "median", "max", "min"],
+          "description": "Score aggregation across instances",
+          "default": "mean"
+        }
+      }
+    },
+    "OutputConfiguration": {
+      "type": "object",
+      "description": "Output configuration for file paths and formatting. Used in EnvironmentConfiguration, EvaluationConfiguration, and PredictionConfiguration to specify where to save outputs and how to format them.",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Output file path. Supports environment variables and template variables (e.g., {instance_id}, {run_id})."
+        },
+        "format": {
+          "type": "string",
+          "enum": ["json", "yaml"],
+          "description": "Output format",
+          "default": "json"
+        },
+        "pretty": {
+          "type": "boolean",
+          "description": "Pretty-print output (indentation and formatting)",
+          "default": true
+        },
+        "console_output": {
+          "type": "boolean",
+          "description": "Print report to console in addition to file output. Useful for debugging and CI/CD pipelines.",
+          "default": false
+        },
+        "rewrite": {
+          "type": "boolean",
+          "description": "Delete existing report file before creating new one. If false, appends to existing file or creates new file if not exists.",
+          "default": false
+        },
+        "type": {
+          "type": "string",
+          "description": "Report type for factory method (default: 'json'). Future extension point for CSV, HTML, etc.",
+          "default": "json",
+          "examples": ["json", "yaml", "csv", "html"]
+        },
+        "fields": {
+          "type": "object",
+          "description": "Additional fields to add to each instance result at the top level. Supports both static values and Jinja2 templates (e.g., '{{ instance.repo }}', '{{ run_id }}', '{{ agent }}'). Fields are resolved per-instance and merged into the result dict alongside 'result', 'duration', etc.",
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" }
+            ]
+          },
+          "examples": [
+            {
+              "experiment": "baseline",
+              "model": "{{ agent }}",
+              "repo": "{{ instance.repo }}"
+            }
+          ]
+        }
+      }
+    },
+    "LogConfiguration": {
+      "type": "object",
+      "properties": {
+        "verbose": {
+          "type": "boolean",
+          "description": "Verbose output mode",
+          "default": false
+        },
+        "quiet": {
+          "type": "boolean",
+          "description": "Minimal output mode",
+          "default": false
+        },
+        "log_level": {
+          "type": "string",
+          "enum": ["DEBUG", "INFO", "WARNING", "ERROR"],
+          "description": "Logging level",
+          "default": "INFO"
+        },
+        "log_file": {
+          "type": "string",
+          "description": "Log file path. Supports environment variables."
+        }
+      }
+    },
+    "OptionsConfiguration": {
+      "type": "object",
+      "properties": {
+        "cache": {
+          "type": "object",
+          "description": "Caching options",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "directory": {
+              "type": "string",
+              "description": "Cache directory path"
+            },
+            "ttl": {
+              "type": "integer",
+              "description": "Cache TTL in seconds"
+            }
+          }
+        },
+        "concurrency": {
+          "type": "object",
+          "description": "Concurrency options",
+          "properties": {
+            "max_concurrent_evaluations": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_concurrent_environments": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "validation": {
+          "type": "object",
+          "description": "Validation options for dataset and configuration validation",
+          "properties": {
+            "strict": {
+              "type": "boolean",
+              "description": "Enable strict validation (fail on warnings)"
+            },
+            "skip_dataset_validation": {
+              "type": "boolean",
+              "description": "Skip dataset format validation"
+            },
+            "skip_config_validation": {
+              "type": "boolean",
+              "description": "Skip configuration validation"
+            }
+          },
+          "additionalProperties": true
+        },
+        "debug": {
+          "type": "object",
+          "description": "Debug options",
+          "properties": {
+            "save_intermediate_results": {
+              "type": "boolean",
+              "default": false
+            },
+            "keep_containers": {
+              "type": "boolean",
+              "description": "Don't cleanup Docker containers after evaluation",
+              "default": false
+            },
+            "verbose_logs": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      }
+    },
+    "ScriptConfiguration": {
+      "description": "Script configuration supporting multiple formats: inline string, type aliases (shell, bash, python, etc.), or full script specification with files and environment.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Inline shell command (treated as shell script)",
+          "examples": ["echo 'hello'", "python --version", "npm install"]
+        },
+        {
+          "type": "object",
+          "description": "Script with type alias (shell, bash, sh, python, java, kotlin, javascript, ruby, go)",
+          "properties": {
+            "shell": {
+              "type": "string",
+              "description": "Inline shell command"
+            },
+            "bash": {
+              "type": "string",
+              "description": "Inline bash command"
+            },
+            "sh": {
+              "type": "string",
+              "description": "Inline sh command"
+            },
+            "python": {
+              "type": "string",
+              "description": "Inline Python command"
+            },
+            "java": {
+              "type": "string",
+              "description": "Inline Java command"
+            },
+            "kotlin": {
+              "type": "string",
+              "description": "Inline Kotlin command"
+            },
+            "javascript": {
+              "type": "string",
+              "description": "Inline JavaScript command"
+            },
+            "ruby": {
+              "type": "string",
+              "description": "Inline Ruby command"
+            },
+            "go": {
+              "type": "string",
+              "description": "Inline Go command"
+            }
+          },
+          "additionalProperties": false,
+          "minProperties": 1,
+          "maxProperties": 1
+        },
+        {
+          "type": "object",
+          "description": "Full script specification with files, working directory, and environment",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["shell", "bash", "python", "java", "kotlin", "javascript", "ruby", "go"],
+              "description": "Script type/language"
+            },
+            "files": {
+              "type": "array",
+              "description": "Script files to include",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "description": "File name (content loaded from resources)"
+                  },
+                  {
+                    "type": "object",
+                    "description": "File specification with name and optional path/content",
+                    "required": ["name"],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "File name"
+                      },
+                      "path": {
+                        "type": "string",
+                        "description": "Path to file content (relative to resources)"
+                      },
+                      "content": {
+                        "type": "string",
+                        "description": "Inline file content"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "entry_point": {
+              "type": "string",
+              "description": "Main file to execute (defaults to first file)"
+            },
+            "interpreter": {
+              "type": "string",
+              "description": "Custom interpreter path (e.g., '/usr/bin/python3.11')"
+            },
+            "interpreter_args": {
+              "type": "array",
+              "description": "Arguments passed to the interpreter (e.g., ['-u', '-W', 'ignore'] for Python)",
+              "items": {
+                "type": "string"
+              },
+              "examples": [["-u", "-W", "ignore"], ["--experimental-modules"]]
+            },
+            "working_dir": {
+              "type": "string",
+              "description": "Working directory for script execution"
+            },
+            "env": {
+              "type": "object",
+              "description": "Environment variables for script execution",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "prerequisites": {
+              "type": "array",
+              "description": "List of prerequisites that must be installed before running this script",
+              "items": {
+                "type": "string"
+              },
+              "examples": [["node:18", "npm:latest"], ["python:3.11"]]
+            },
+            "timeout": {
+              "type": "integer",
+              "description": "Script execution timeout in seconds",
+              "minimum": 1,
+              "examples": [300, 600, 1800]
+            },
+            "args": {
+              "type": "array",
+              "description": "Command-line arguments passed to the script",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        "echo 'hello'",
+        {"shell": "npm install"},
+        {"bash": "apt-get update && apt-get install -y python3"},
+        {"python": "print('hello')"},
+        {
+          "type": "bash",
+          "files": [
+            {"name": "install.sh", "path": "resources/install.sh"}
+          ],
+          "working_dir": "/workspace",
+          "timeout": 600
+        },
+        {
+          "type": "python",
+          "files": [
+            {"name": "setup.py", "content": "print('setup')"}
+          ],
+          "interpreter": "/usr/bin/python3.11",
+          "interpreter_args": ["-u", "-W", "ignore"],
+          "env": {
+            "PYTHONPATH": "/workspace/lib"
+          },
+          "prerequisites": ["python:3.11"],
+          "timeout": 300
+        }
+      ]
+    }
+  }
+}

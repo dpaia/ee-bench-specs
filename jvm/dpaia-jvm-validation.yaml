@@ -1,0 +1,150 @@
+# Complete YAML Configuration Example
+#
+# This example demonstrates all available configuration options
+# for the ee-bench YAML configuration system.
+#
+# Usage:
+#   ee-bench --config examples/yaml-configs/complete.yaml --spec jvm run-evaluation
+
+version: "1.0"
+spec: jvm
+name: "Validate datapoints for DPAIA benchmark"
+tags:
+  - jvm
+  - validation
+
+metadata:
+  author: "DPAIA"
+
+# Dataset configuration
+dataset:
+  source:
+    type: "file"
+    format: "json"
+    path: "/Users/Evgenii.Zakharchenko/IdeaProjects/LLM/EE-benchmark/demo-of-python-tooling-poc/datasets/jvm/java-spring-ee-dataset.json"
+
+  # Dataset options
+  cache: true
+
+# Environment configuration
+environment:
+  # Load pre-configured environment (optional)
+  # config_path: environment-config.json
+
+  # Sandbox configuration
+  sandbox:
+    type: docker          # docker or local
+
+    docker:
+      privileged: true    # Required for DinD
+      cache: true
+      network: bridge
+      # No volume mount needed - we'll run Docker daemon inside the container
+
+    # Sandbox environment variables (shared across docker/local)
+    env:
+      # Docker-in-Docker configuration for Testcontainers
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+      # Force Testcontainers to use Unix socket strategy (not DockerDesktop)
+      TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: "/var/run/docker.sock"
+      TESTCONTAINERS_HOST_OVERRIDE: "unix:///var/run/docker.sock"
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+      TESTCONTAINERS_CHECKS_DISABLE: "true"
+      TZ: "UTC"
+      LANGFUSE_HOST: "{{ env.LANGFUSE_HOST }}"
+      LANGFUSE_SECRET_KEY: "{{ env.LANGFUSE_SECRET_KEY }}"
+      LANGFUSE_PUBLIC_KEY: "{{ env.LANGFUSE_PUBLIC_KEY }}"
+
+  # Workspace directory
+  workspace_dir: "/workspace"
+  project_dir: "/workspace/task_project"
+
+  # Docker image configuration (simple format)
+  image: "dpaia-{{ instance.instance_id }}:dependencies"
+
+  # Build options
+  parallel: true          # Build environments in parallel
+  max_workers: 8          # Number of parallel workers
+
+# Evaluation configuration
+evaluations:
+  - id: validation
+    name: Validate datapoint
+
+    evaluators:
+      - name: project_reset
+        description: "Reset project to original state"
+        type: project_reset       # factory name
+        is_terminal: false        # Not a terminal evaluator
+        max_score: 0
+        timeout: 200
+
+      - name: pass_to_pass_validation
+        description: "Validate pass_to_pass tests pass with test patch"
+        type: jvm__test_runner
+        is_terminal: true
+        max_score: 0
+        timeout: 600
+        options:
+          tests: "{{ instance.pass_to_pass }}"
+          expect_pass: true
+
+      - name: test_patch_application
+        description: "Apply test patch from dataset"
+        type: patch_application
+        is_terminal: true
+        options:
+          patch: "{{ instance.test_patch }}"
+
+      - name: fail_to_pass_validation
+        description: "Validate fail_to_pass tests fail with test patch"
+        type: jvm__test_runner
+        is_terminal: true
+        max_score: 0
+        timeout: 600
+        options:
+          tests: "{{ instance.fail_to_pass }}"
+          expect_pass: false
+
+      - name: apply_gold_patch
+        description: "Apply gold patch to project"
+        type: patch_application
+        is_terminal: true
+        options:
+          patch: "{{ instance.patch }}"
+          can_skip_patch: true
+
+      - name: all_tests_validation
+        description: "Validate all tests pass with test patch"
+        type: jvm__test_runner
+        is_terminal: true
+        timeout: 600
+        options:
+          tests: "{{ instance.all_tests }}"
+          expect_pass: true
+
+    # Execution options
+    parallel: true               # Run evaluations in parallel
+    max_workers: 4               # Number of parallel evaluators
+    timeout: 3600                # Total evaluation timeout
+
+    # Scoring configuration
+    scoring:
+      method: weighted_sum       # sum, weighted_sum, average
+      weights:
+        all_tests_validation: 1.0
+      normalize: true            # Normalize scores to 0-1
+      aggregation: mean          # sum, mean, median, max, min
+
+    # Output configuration for evaluation results
+    output:
+      path: result/{{ instance.instance_id }}/validation-{{ run_id }}.json  # Path to save evaluation results
+      format: json                     # json or yaml
+      pretty: true                     # Pretty-print output
+
+# Log configuration (Logging)
+log:
+  # Logging options
+  verbose: true                # Verbose output mode
+  quiet: false                 # Minimal output mode
+  log_file: logs/log.log       # Log file path

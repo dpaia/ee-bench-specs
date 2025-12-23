@@ -1,0 +1,278 @@
+# Complete YAML Configuration Example
+#
+# This example demonstrates all available configuration options
+# for the ee-bench YAML configuration system.
+#
+# Usage:
+#   ee-bench --config examples/yaml-configs/complete.yaml --spec jvm run-evaluation
+
+version: "1.0"
+spec: jvm
+name: "Evaluate predictions for DPAIA"
+description: "Evaluate predictions for DPAIA"
+tags:
+  - jvm
+  - cli agent
+
+metadata:
+  author: "DPAIA"
+
+# Dataset configuration
+dataset:
+  source:
+    type: "file"
+    format: "json"
+    path: "/Users/Evgenii.Zakharchenko/IdeaProjects/LLM/EE-benchmark/demo-of-python-tooling-poc/datasets/jvm/java-spring-ee-dataset.json"
+
+  cache: true             # Cache dataset locally
+
+# Environment configuration
+environment:
+  # Load pre-configured environment (optional)
+  # config_path: environment-config.json
+
+  # Sandbox configuration
+  sandbox:
+    type: docker          # docker or local
+
+    docker:
+      privileged: true
+      cache: true
+      network: bridge
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+
+    # Sandbox environment variables (shared across docker/local)
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+      TESTCONTAINERS_CHECKS_DISABLE: "true"
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+      TZ: "UTC"
+
+  # Workspace directory
+  workspace_dir: "/workspace"
+  project_dir: "/workspace/task_project"
+
+  # Docker image configuration (simple format - base image only)
+  image: "dpaia-{{ instance.instance_id }}:dependencies"
+
+predictions:
+  - id: agent-blind
+    name: Agent Blind Predictions
+    source: file
+    file:
+      path: result/{{ instance.instance_id }}/{{ agent }}-blind-predictions.json
+      format: json
+
+  - id: agent-informed
+    name: Agent Informed Predictions
+    source: file
+    file:
+      path: result/{{ instance.instance_id }}/{{ agent }}-informed-predictions.json
+      format: json
+
+# Evaluation configuration
+evaluations:
+  - id: blind
+    name: Blind
+
+    evaluators:
+      - name: project_reset
+        description: "Reset project to original state"
+        type: project_reset       # factory name
+        is_terminal: false        # Not a terminal evaluator
+        max_score: 0
+        timeout: 200
+
+      - name: baseline_evaluation
+        description: "Run baseline tests to verify initial state"
+        type: jvm__test_runner # factory name
+        is_terminal: false
+        max_score: 0
+        timeout: 600
+        options:
+          tests: '*'
+          expect_pass: true
+
+      - name: collect_prediction
+        description: "Collect prediction patch"
+        type: prediction_application
+        is_terminal: true
+        options:
+          prediction: agent-blind
+          output: "prediction_patch"
+
+      - name: apply_prediction
+        description: "Apply prediction patch to project"
+        type: patch_application
+        is_terminal: true
+        options:
+          patch: "{{ prediction_patch }}"
+          can_skip_patch: true
+
+      - name: all_tests_validation
+        description: "Validate all tests pass with test patch"
+        type: jvm__test_runner
+        is_terminal: true
+        timeout: 600
+        options:
+          tests: "{{ instance.all_tests }}"
+          expect_pass: true
+
+      - name: test_patch_application
+        description: "Apply test patch to test prediction with tests"
+        type: patch_application
+        is_terminal: true
+        options:
+          patch: "{{ instance.test_patch }}"
+          can_skip_patch: true
+
+      - name: all_tests_after_prediction
+        description: "Run all tests after prediction for regression detection"
+        type: jvm__test_runner
+        is_terminal: false
+        timeout: 600
+        options:
+          tests: '*'
+          expect_pass: true
+
+      - name: regression_detection
+        description: "Detect test regressions compared to baseline"
+        type: regression_detection
+        is_terminal: false
+        timeout: 200
+        options:
+          baseline: "baseline-evaluation"
+          test_results: "all_tests_after_prediction"
+
+
+    # Execution options
+    parallel: true               # Run evaluations in parallel
+    max_workers: 4               # Number of parallel evaluators
+    timeout: 3600                # Total evaluation timeout
+
+    # Scoring configuration
+    scoring:
+      method: weighted_sum       # sum, weighted_sum, average
+      weights:
+        all_tests_validation: 1.0
+        regression_detection: 0.25
+      normalize: 100              # Normalize scores to this value (1.0 = 0-1 range, 100.0 = 0-100 range)
+      aggregation: mean          # sum, mean, median, max, min
+
+    # Output configuration for evaluation results
+    output:
+      path: result/{{ instance.instance_id }}/{{ run_id }}/{{ agent }}-blind-evaluation.json  # Path to save evaluation results
+      format: json                     # json or yaml
+      pretty: true                     # Pretty-print output
+      fields:
+        prediction: blind
+        instance_id: "{{ instance.instance_id }}"
+        repo: "{{ instance.repo }}"
+        base_commit: "{{ instance.base_commit }}"
+        issue_numbers: "{{ instance.issue_numbers }}"
+        tags: "{{ instance.tags }}"
+        problem_statement: "{{ instance.problem_statement }}"
+
+  - id: informed
+    name: Informed
+
+    evaluators:
+      - name: project_reset
+        description: "Reset project to original state"
+        type: project_reset       # factory name
+        is_terminal: false        # Not a terminal evaluator
+        max_score: 0
+        timeout: 200
+
+      - name: baseline_evaluation
+        description: "Run baseline tests to verify initial state"
+        type: jvm__test_runner # factory name
+        is_terminal: false
+        max_score: 0
+        timeout: 600
+        options:
+          tests: '*'
+          expect_pass: true
+
+      - name: collect_prediction
+        description: "Collect prediction patch"
+        type: prediction_application
+        is_terminal: true
+        options:
+          prediction: agent-informed
+          output: "prediction_patch"
+
+      - name: apply_prediction
+        description: "Apply prediction patch to project"
+        type: patch_application
+        is_terminal: true
+        options:
+          patch: "{{ prediction_patch }}"
+          can_skip_patch: true
+
+      - name: all_tests_after_prediction
+        description: "Run all tests after prediction for regression detection"
+        type: jvm__test_runner
+        is_terminal: false
+        timeout: 600
+        options:
+          tests: '*'
+          expect_pass: true
+
+      - name: all_tests_validation
+        description: "Validate all tests pass with test patch"
+        type: jvm__test_runner
+        is_terminal: true
+        timeout: 600
+        options:
+          tests: "{{ instance.all_tests }}"
+          expect_pass: true
+
+      - name: regression_detection
+        description: "Detect test regressions compared to baseline"
+        type: regression_detection
+        is_terminal: false
+        timeout: 200
+        options:
+          baseline: "baseline-evaluation"
+          test_results: "all_tests_after_prediction"
+
+
+    # Execution options
+    parallel: true               # Run evaluations in parallel
+    max_workers: 4               # Number of parallel evaluators
+    timeout: 3600                # Total evaluation timeout
+
+    # Scoring configuration
+    scoring:
+      method: weighted_sum       # sum, weighted_sum, average
+      weights:
+        all_tests_validation: 1.0
+        regression_detection: 0.25
+      normalize: 50.0            # Normalize scores to this value (1.0 = 0-1 range, 100.0 = 0-100 range)
+      aggregation: mean          # sum, mean, median, max, min
+
+    # Output configuration for evaluation results
+    output:
+      path: result/{{ instance.instance_id }}/{{ run_id }}/{{ agent }}-informed-evaluation.json  # Path to save evaluation results
+      format: json                     # json or yaml
+      pretty: true                     # Pretty-print output
+      fields:
+        prediction: informed
+        instance_id: "{{ instance.instance_id }}"
+        repo: "{{ instance.repo }}"
+        base_commit: "{{ instance.base_commit }}"
+        issue_numbers: "{{ instance.issue_numbers }}"
+        tags: "{{ instance.tags }}"
+        problem_statement: "{{ instance.problem_statement }}"
+
+# Log configuration (Logging)
+log:
+  # Logging options
+  verbose: true                # Verbose output mode
+  quiet: false                 # Minimal output mode
+  log_file: logs/log.log       # Log file path
+
+options:
+  agent: claude-code

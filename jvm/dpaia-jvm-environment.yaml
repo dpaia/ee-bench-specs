@@ -1,0 +1,97 @@
+# Complete YAML Configuration Example
+#
+# This example demonstrates all available configuration options
+# for the ee-bench YAML configuration system.
+#
+# Usage:
+#   ee-bench --config examples/yaml-configs/complete.yaml --spec jvm run-evaluation
+
+version: "1.0"
+spec: jvm
+name: "Prepare environment for DPAIA benchmark"
+tags:
+  - jvm
+  - environment
+
+metadata:
+  author: "DPAIA"
+
+# Dataset configuration
+dataset:
+  source:
+    type: "file"
+    format: "json"
+    path: "/Users/Evgenii.Zakharchenko/IdeaProjects/LLM/EE-benchmark/demo-of-python-tooling-poc/datasets/jvm/java-spring-ee-dataset.json"
+
+  # Dataset options
+  cache: true             # Cache dataset locally
+
+# Environment configuration
+environment:
+  # Load pre-configured environment (optional)
+  # config_path: environment-config.json
+
+  # Sandbox configuration
+  sandbox:
+    type: docker          # docker or local
+
+  # Workspace directory
+  workspace_dir: "/workspace"
+  project_dir: "/workspace/task_project"
+
+  # Docker image configuration
+  image:
+    base: "eclipse-temurin:{{ instance.jvm_version | default('24') }}-jdk"
+    namespace: "dpaia"
+    force: true
+
+  # Environment configurers
+  configurers:
+    - name: "Base image with JDK"
+      description: "Prepare base image with JDK"
+      type: jvm__base
+      options:
+        jdk_version: "{{ instance.jvm_version | default('24') }}" # jvm_version is a variable defined in dataset file for instance
+        distribution: temurin
+
+    - name: "Build system"
+      description: "Prepare build system"
+      type: jvm__build_system
+      options:
+        build_system: "{{ instance.build_system }}"
+
+    - name: "Clone repository"
+      description: "Clone repository and checkout commit"
+      type: git_checkout
+      options:
+        url: "https://github.com/{{ instance.repo }}"
+        base_commit: "{{ instance.base_commit }}"
+        target_dir: "{{ env_config.project_dir}}"
+
+    - name: "Dependencies"
+      description: "Resolve build system dependencies"
+      type: jvm__dependencies
+      options:
+        build_system: "{{ instance.build_system }}"
+      image:
+        namespace: dpaia
+        name: "dpaia-{{ instance.instance_id }}:dependencies"
+        build: true
+
+  # Build options
+  parallel: true          # Build environments in parallel
+  max_workers: 8          # Number of parallel workers
+  timeout: 1800           # Timeout per environment (seconds)
+
+  # Output configuration for environment config files
+  output:
+    path: result/{{ instance.instance_id }}/env-config.json  # Path to save environment configuration
+    format: json                         # json or yaml
+    pretty: true                         # Pretty-print output
+
+# Log configuration (Logging)
+log:
+  # Logging options
+  verbose: true                # Verbose output mode
+  quiet: false                 # Minimal output mode
+  log_file: logs/log.log       # Log file path

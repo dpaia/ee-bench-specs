@@ -1,0 +1,271 @@
+# Complete YAML Configuration Example
+#
+# This example demonstrates all available configuration options
+# for the ee-bench YAML configuration system.
+#
+# Usage:
+#   ee-bench --config examples/yaml-configs/complete.yaml --spec jvm run-evaluation
+
+version: "1.0"
+spec: jvm
+name: "Collect agent predictions for DPAIA benchmark"
+tags:
+  - jvm
+  - predictions
+
+metadata:
+  author: "DPAIA"
+
+# Agent configuration - define one or more agents
+agents:
+  # Claude Code IDE Agent
+  - name: "claude-code-idea-mcp"
+    description: "Claude Code assistant with IntelliJ IDEA MCP server integration. Provides AI-powered code assistance with IDE capabilities through MCP."
+    version: "2.0.67"
+    type: "claude-code" # To reuse agent result parser and features from claude code agent
+    primary: true
+    role: "code-assistant"
+    timeout: 1800
+
+    version_command:
+      type: shell
+      #language=bash
+      content: |
+        #!/bin/bash
+        set -e
+
+        # Get Claude Code version
+        if command -v claude &> /dev/null; then
+            CLAUDE_VERSION=$(claude --version 2>&1)
+        else
+            CLAUDE_VERSION="not installed"
+        fi
+
+        # Get IDEA version (if available)
+        if command -v idea &> /dev/null; then
+            IDEA_VERSION=$(idea --version 2>&1 || echo "unknown")
+        else
+            IDEA_VERSION="not available"
+        fi
+
+        # Output combined version
+        echo "claude-code-ide: Claude=$CLAUDE_VERSION, IDEA=$IDEA_VERSION"
+
+    entry_command:
+      type: shell
+      #language=bash
+      content: |
+        #!/bin/bash
+        # Execution script for Claude Code IDEA Agent
+
+        set -e
+
+        echo "=== Claude Code IDEA Agent ==="
+        echo "Project: $TARGET_PROJECT"
+        echo ""
+
+        # Start IDEA MCP server and open project
+        echo "→ Starting IDEA MCP Server..."
+        if idea-mcp-server open "$TARGET_PROJECT" 2>&1 | grep -E "Starting IDEA|MCP endpoint ready|MCP Server started|already running|Command sent" | sed 's/\[INFO\] //g'; then
+            echo "✓ IDEA MCP Server ready at http://localhost:64342/sse"
+        else
+            echo "✗ Failed to start IDEA MCP Server"
+            exit 1
+        fi
+        echo ""
+
+        # Run Claude Code
+        echo "→ Starting Claude Code..."
+
+        # Run Claude Code with MCP configuration
+        # The MCP tools path is automatically configured by the MCP feature system
+        set +e
+        claude-code "$@"
+        CLAUDE_EXIT_CODE=$?
+        set -e
+
+        echo ""
+        if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+            echo "✓ Claude Code finished (exit code: $CLAUDE_EXIT_CODE)"
+        else
+            echo "✗ Claude Code failed (exit code: $CLAUDE_EXIT_CODE)"
+        fi
+        echo ""
+
+        # Stop IDEA MCP server (ignore any errors)
+        echo "→ Stopping IDEA..."
+        if idea-mcp-server stop 2>&1 | grep -E "IDEA stopped|not running" > /dev/null; then
+            echo "✓ IDEA stopped"
+        else
+            echo "✗ Failed to stop IDEA (ignoring error)"
+        fi
+
+        echo ""
+        echo "=== Agent Complete ==="
+        exit $CLAUDE_EXIT_CODE
+
+    entry_command_alias: "claude-code-idea"
+
+    # Environment variables
+    env:
+      TARGET_PROJECT: "/workspace/task_project"
+
+    dependencies:
+      - name: "claude-code"
+        version: "2.0.67"
+        type: "claude-code"
+
+      - name: "idea-mcp-server"
+        type: "idea-mcp-server"
+        version: "252"
+        options:
+          edition: ultimate
+          project_warmup: true
+
+      - name: "langfuse-telemetry-bridge"
+        version: "1.0.0"
+        options:
+          host: "$LANGFUSE_HOST"
+          private_key: "$LANGFUSE_SECRET_KEY"
+          public_key: "$LANGFUSE_PUBLIC_KEY"
+          name: "{{ instance.instance_id }}"
+          tags:
+            - "dpaia"
+            - "jvm"
+            - "claude-code"
+            - "idea-mcp-server"
+            - "{{ instance.instance_id }}"
+            - "{{ instance.build_system }}"
+            - "{{ instance.language }}"
+          metadata:
+            instance_id: "{{ instance.instance_id }}"
+            agent: "claude-code-idea-mcp"
+            repo: "{{ instance.repo }}"
+            base_commit: "{{ instance.base_commit }}"
+            problem_statement: "{{ instance.problem_statement }}"
+            fail_to_pass: "{{ instance.fail_to_pass }}"
+            pass_to_pass: "{{ instance.pass_to_pass }}"
+            issue_numbers: "{{ instance.issue_numbers }}"
+            tags: "{{ instance.tags }}"
+            version: "{{ instance.version }}"
+            language: "{{ instance.language }}"
+            build_system: "{{ instance.build_system }}"
+
+    # Features configuration (MCP, telemetry, etc.)
+    features:
+      # MCP servers configuration (connects to IDEA MCP server)
+      mcp:
+        servers:
+          jetbrains-idea:
+            type: "sse"
+            url: "http://127.0.0.1:64342/sse"
+            headers:
+              IJ_MCP_SERVER_project_dir: "/workspace/task_project"
+
+      # Telemetry configuration
+      telemetry:
+        enabled: true
+        bridge: true
+        log_prompts: true
+
+    # Metadata
+    metadata:
+      author: "DPAIA"
+
+# Dataset configuration
+dataset:
+  source:
+    type: "file"
+    format: "json"
+    path: "/Users/Evgenii.Zakharchenko/IdeaProjects/LLM/EE-benchmark/demo-of-python-tooling-poc/datasets/jvm/java-spring-ee-dataset.json"
+
+  # Dataset options
+  cache: true
+
+# Environment configuration
+environment:
+
+  # Sandbox configuration
+  sandbox:
+    type: docker          # docker or local
+
+    docker:
+      privileged: true
+      cache: true
+      network: bridge
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+
+    # Sandbox environment variables (shared across docker/local)
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+      TESTCONTAINERS_CHECKS_DISABLE: "true"
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+      TZ: "UTC"
+      ANTHROPIC_API_KEY: "{{ env.ANTHROPIC_API_KEY }}"
+      # Telemetry bridge configuration (enables langfuse-telemetry-bridge integration)
+      LANGFUSE_HOST: "{{ env.LANGFUSE_HOST }}"
+      LANGFUSE_SECRET_KEY: "{{ env.LANGFUSE_SECRET_KEY }}"
+      LANGFUSE_PUBLIC_KEY: "{{ env.LANGFUSE_PUBLIC_KEY }}"
+
+  # Workspace directory
+  workspace_dir: "/workspace"
+  project_dir: "/workspace/task_project"
+
+  # Docker image configuration (simple format)
+  image: "dpaia-{{ instance.instance_id }}:dependencies"
+
+  # Build options
+  parallel: true          # Build environments in parallel
+  max_workers: 8          # Number of parallel workers
+
+  # Environment configurers
+  configurers:
+    - name: "agent-configurator"
+      description: "Configure agent environment"
+      type: agents
+
+predictions:
+  # Claude Code IDE agent predictions
+  - id: blind-idea
+    name: Agent Blind Prediction (Claude Code IDE)
+    source: agent-code
+    agent: "claude-code-idea-mcp"
+    prompt: |
+      Fix the following issue by making code changes. You have access to IntelliJ IDEA
+      through its MCP server for advanced code analysis and refactoring capabilities.
+
+      Problem Statement:
+      {{ instance.problem_statement }}
+
+    output:
+      path: result/{{ instance.instance_id }}/claude-code-ide-blind-predictions.json
+      pretty: true
+
+  - id: informed-idea
+    name: Agent Informed Prediction (Claude Code IDE)
+    source: agent-test
+    agent: "claude-code-idea-mcp"
+    prompt: |
+      Fix the following issue by making code changes. You have access to IntelliJ IDEA
+      through its MCP server and test information to guide your fix.
+
+      Problem Statement:
+      {{ instance.problem_statement }}
+
+      Tests that should pass after the fix:
+      {{ instance.fail_to_pass }}
+
+      Tests that must continue passing:
+      {{ instance.pass_to_pass }}
+
+    output:
+      path: result/{{ instance.instance_id }}/claude-code-ide-informed-predictions.json
+      pretty: true
+
+# Log configuration (Logging)
+log:
+  # Logging options
+  verbose: true                # Verbose output mode
+  quiet: false                 # Minimal output mode
+  log_file: logs/log.log       # Log file path
