@@ -5,7 +5,7 @@ This directory contains YAML configuration specifications and the JSON Schema fo
 ## Files
 
 - **`benchmark-config-schema.json`**: JSON Schema defining the structure and validation rules for YAML configurations
-- **`dpaia-jvm.yaml`**: Complete example configuration demonstrating all available options
+- **`jvm/dpaia-jvm-*.yaml`**: Complete examples configuration demonstrating all available options
 
 ## YAML Configuration Schema
 
