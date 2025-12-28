@@ -44,7 +44,7 @@ environment:
     base: "eclipse-temurin:{{ instance.jvm_version | default('24') }}-jdk"
     namespace: "dpaia"
     force: true
-    name: "dpaia-{{ instance.instance_id }}:dependencies"
+    name: "{{ instance.instance_id }}:dependencies"
     build: true
 
   # Environment configurers
