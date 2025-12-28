@@ -21,11 +21,15 @@ agents:
   # Claude Code IDE Agent
   - name: "claude-code-idea-mcp"
     description: "Claude Code assistant with IntelliJ IDEA MCP server integration. Provides AI-powered code assistance with IDE capabilities through MCP."
-    version: "2.0.67"
+    version: "latest"
     type: "claude-code" # To reuse agent result parser and features from claude code agent
     primary: true
     role: "code-assistant"
     timeout: 1800
+
+    install_command:
+      shell: |
+        echo "Claude Code IDE Agent is already installed as dependency"
 
     version_command:
       type: shell
@@ -112,12 +116,12 @@ agents:
 
     dependencies:
       - name: "claude-code"
-        version: "2.0.67"
+        version: "latest"
         type: "claude-code"
 
       - name: "idea-mcp-server"
         type: "idea-mcp-server"
-        version: "252"
+        version: 253
         options:
           edition: ultimate
           project_warmup: true
@@ -175,15 +179,17 @@ agents:
 # Dataset configuration
 dataset:
   source:
-    type: "file"
+    type: "http"
     format: "json"
-    path: "/Users/Evgenii.Zakharchenko/IdeaProjects/LLM/EE-benchmark/demo-of-python-tooling-poc/datasets/jvm/java-spring-ee-dataset.json"
+    uri: "{{ dataset_uri }}"
 
   # Dataset options
   cache: true
 
 # Environment configuration
 environment:
+  # Load pre-configured environment (optional)
+  # config_path: environment-config.json
 
   # Sandbox configuration
   sandbox:
@@ -266,6 +272,8 @@ predictions:
 # Log configuration (Logging)
 log:
   # Logging options
-  verbose: true                # Verbose output mode
-  quiet: false                 # Minimal output mode
+  # verbose: true                # Verbose output mode
   log_file: logs/log.log       # Log file path
+
+options:
+  dataset_uri: "https://raw.githubusercontent.com/dpaia/ee-dataset/refs/tags/{{ dataset_version | default('v20251028') }}/datasets/java-spring-ee-dataset.json"

@@ -1595,11 +1595,6 @@
           "type": "object",
           "description": "Additional evaluation-specific options. Passed to evaluation runner for customizing behavior.",
           "additionalProperties": true
-        },
-        "results_key": {
-          "type": "string",
-          "description": "Key to use when storing/reading evaluation results in report files. Useful for distinguishing multiple evaluation runs in the same report.",
-          "examples": ["gold_results", "agent_results", "baseline_results"]
         }
       }
     },
@@ -1863,6 +1858,12 @@
               "repo": "{{ instance.repo }}"
             }
           ]
+        },
+        "results_key": {
+          "type": "string",
+          "description": "Key to use for results dictionary in JSON output (default: 'results'). Used for customizing the top-level key in report files (e.g., 'gold_results', 'agent_results', 'predictions').",
+          "default": "default",
+          "examples": ["results", "gold_results", "agent_results", "predictions", "baseline_results"]
         }
       }
     },

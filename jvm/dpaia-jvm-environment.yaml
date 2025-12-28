@@ -19,9 +19,9 @@ metadata:
 # Dataset configuration
 dataset:
   source:
-    type: "file"
+    type: "http"
     format: "json"
-    path: "/Users/Evgenii.Zakharchenko/IdeaProjects/LLM/EE-benchmark/demo-of-python-tooling-poc/datasets/jvm/java-spring-ee-dataset.json"
+    uri: "{{ dataset_uri }}"
 
   # Dataset options
   cache: true             # Cache dataset locally
@@ -44,6 +44,8 @@ environment:
     base: "eclipse-temurin:{{ instance.jvm_version | default('24') }}-jdk"
     namespace: "dpaia"
     force: true
+    name: "dpaia-{{ instance.instance_id }}:dependencies"
+    build: true
 
   # Environment configurers
   configurers:
@@ -59,6 +61,7 @@ environment:
       type: jvm__build_system
       options:
         build_system: "{{ instance.build_system }}"
+        is_maven: "{{ instance.is_maven }}"
 
     - name: "Clone repository"
       description: "Clone repository and checkout commit"
@@ -73,10 +76,7 @@ environment:
       type: jvm__dependencies
       options:
         build_system: "{{ instance.build_system }}"
-      image:
-        namespace: dpaia
-        name: "dpaia-{{ instance.instance_id }}:dependencies"
-        build: true
+        is_maven: "{{ instance.is_maven }}"
 
   # Build options
   parallel: true          # Build environments in parallel
@@ -95,3 +95,6 @@ log:
   verbose: true                # Verbose output mode
   quiet: false                 # Minimal output mode
   log_file: logs/log.log       # Log file path
+
+options:
+  dataset_uri: "https://raw.githubusercontent.com/dpaia/ee-dataset/refs/tags/{{ dataset_version | default('v20251028') }}/datasets/java-spring-ee-dataset.json"

@@ -20,9 +20,9 @@ metadata:
 # Dataset configuration
 dataset:
   source:
-    type: "file"
+    type: "http"
     format: "json"
-    path: "/Users/Evgenii.Zakharchenko/IdeaProjects/LLM/EE-benchmark/demo-of-python-tooling-poc/datasets/jvm/java-spring-ee-dataset.json"
+    uri: "{{ dataset_uri }}"
 
   cache: true             # Cache dataset locally
 
@@ -91,6 +91,8 @@ evaluations:
         max_score: 0
         timeout: 600
         options:
+          build_system: "{{ instance.build_system }}"
+          is_maven: "{{ instance.is_maven }}"
           tests: '*'
           expect_pass: true
 
@@ -116,6 +118,8 @@ evaluations:
         is_terminal: true
         timeout: 600
         options:
+          build_system: "{{ instance.build_system }}"
+          is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.all_tests }}"
           expect_pass: true
 
@@ -133,6 +137,8 @@ evaluations:
         is_terminal: false
         timeout: 600
         options:
+          build_system: "{{ instance.build_system }}"
+          is_maven: "{{ instance.is_maven }}"
           tests: '*'
           expect_pass: true
 
@@ -162,11 +168,13 @@ evaluations:
 
     # Output configuration for evaluation results
     output:
-      path: result/{{ instance.instance_id }}/{{ run_id }}/{{ agent }}-blind-evaluation.json  # Path to save evaluation results
+      path: result/{{ agent }}-evaluation.json  # Path to save evaluation results
       format: json                     # json or yaml
       pretty: true                     # Pretty-print output
+      results_key: blind
       fields:
         prediction: blind
+        eval_name: "Blind Score"
         instance_id: "{{ instance.instance_id }}"
         repo: "{{ instance.repo }}"
         base_commit: "{{ instance.base_commit }}"
@@ -255,11 +263,13 @@ evaluations:
 
     # Output configuration for evaluation results
     output:
-      path: result/{{ instance.instance_id }}/{{ run_id }}/{{ agent }}-informed-evaluation.json  # Path to save evaluation results
+      path: result/{{ agent }}-evaluation.json  # Path to save evaluation results
       format: json                     # json or yaml
       pretty: true                     # Pretty-print output
+      results_key: informed
       fields:
         prediction: informed
+        eval_name: "Informed Score"
         instance_id: "{{ instance.instance_id }}"
         repo: "{{ instance.repo }}"
         base_commit: "{{ instance.base_commit }}"
@@ -276,3 +286,4 @@ log:
 
 options:
   agent: claude-code
+  dataset_uri: "https://raw.githubusercontent.com/dpaia/ee-dataset/refs/tags/{{ dataset_version | default('v20251028') }}/datasets/java-spring-ee-dataset.json"

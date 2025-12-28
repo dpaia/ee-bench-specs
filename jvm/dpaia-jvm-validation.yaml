@@ -19,9 +19,9 @@ metadata:
 # Dataset configuration
 dataset:
   source:
-    type: "file"
+    type: "http"
     format: "json"
-    path: "/Users/Evgenii.Zakharchenko/IdeaProjects/LLM/EE-benchmark/demo-of-python-tooling-poc/datasets/jvm/java-spring-ee-dataset.json"
+    uri: "{{ dataset_uri }}"
 
   # Dataset options
   cache: true
@@ -86,6 +86,8 @@ evaluations:
         max_score: 0
         timeout: 600
         options:
+          build_system: "{{ instance.build_system }}"
+          is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.pass_to_pass }}"
           expect_pass: true
 
@@ -103,6 +105,8 @@ evaluations:
         max_score: 0
         timeout: 600
         options:
+          build_system: "{{ instance.build_system }}"
+          is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.fail_to_pass }}"
           expect_pass: false
 
@@ -120,6 +124,8 @@ evaluations:
         is_terminal: true
         timeout: 600
         options:
+          build_system: "{{ instance.build_system }}"
+          is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.all_tests }}"
           expect_pass: true
 
@@ -148,3 +154,6 @@ log:
   verbose: true                # Verbose output mode
   quiet: false                 # Minimal output mode
   log_file: logs/log.log       # Log file path
+
+options:
+  dataset_uri: "https://raw.githubusercontent.com/dpaia/ee-dataset/refs/tags/{{ dataset_version | default('v20251028') }}/datasets/java-spring-ee-dataset.json"
