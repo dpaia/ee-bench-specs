@@ -54,7 +54,7 @@ environment:
   project_dir: "/workspace/task_project"
 
   # Docker image configuration (simple format - base image only)
-  image: "dpaia-{{ instance.instance_id }}:dependencies"
+  image: "{{ instance.instance_id }}:dependencies"
 
 predictions:
   - id: agent-blind
