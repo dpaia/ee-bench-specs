@@ -87,7 +87,7 @@ evaluations:
       - name: test_patch_application
         description: "Apply test patch from dataset"
         type: patch_application
-        is_terminal: true
+        is_terminal: false
         options:
           patch: "{{ instance.test_patch }}"
 
@@ -130,7 +130,7 @@ evaluations:
       - name: test_patch_application
         description: "Apply test patch from dataset"
         type: patch_application
-        is_terminal: true
+        is_terminal: false
         options:
           patch: "{{ instance.test_patch }}"
 

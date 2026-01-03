@@ -114,7 +114,7 @@ evaluations:
       - name: test_patch_application
         description: "Apply test patch to test prediction with tests"
         type: patch_application
-        is_terminal: true
+        is_terminal: false
         options:
           patch: "{{ instance.test_patch }}"
           can_skip_patch: true
