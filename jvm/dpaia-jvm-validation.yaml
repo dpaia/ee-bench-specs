@@ -90,7 +90,6 @@ evaluations:
           is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.pass_to_pass }}"
           expect_pass: true
-          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
 
       - name: test_patch_application
         description: "Apply test patch from dataset"
@@ -98,6 +97,30 @@ evaluations:
         is_terminal: true
         options:
           patch: "{{ instance.test_patch }}"
+
+      - name: "Apply gradle format spotless"
+        type: gradle_command
+        is_terminal: false
+        options:
+          command: "spotlessApply"
+
+      - name: "Apply gradle format"
+        type: gradle_command
+        is_terminal: false
+        options:
+          command: "format"
+
+      - name: "Apply maven format"
+        type: maven_command
+        is_terminal: false
+        options:
+          command: "spring-javaformat:apply"
+
+      - name: "Apply maven format spotless"
+        type: maven_command
+        is_terminal: false
+        options:
+          command: "spotless:apply"
 
       - name: fail_to_pass_validation
         description: "Validate fail_to_pass tests fail with test patch"
@@ -110,7 +133,6 @@ evaluations:
           is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.fail_to_pass }}"
           expect_pass: false
-          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
 
       - name: apply_gold_patch
         description: "Apply gold patch to project"
@@ -119,6 +141,30 @@ evaluations:
         options:
           patch: "{{ instance.patch }}"
           can_skip_patch: true
+
+      - name: "Apply gradle format spotless"
+        type: gradle_command
+        is_terminal: false
+        options:
+          command: "spotlessApply"
+
+      - name: "Apply gradle format"
+        type: gradle_command
+        is_terminal: false
+        options:
+          command: "format"
+
+      - name: "Apply maven format"
+        type: maven_command
+        is_terminal: false
+        options:
+          command: "spring-javaformat:apply"
+
+      - name: "Apply maven format spotless"
+        type: maven_command
+        is_terminal: false
+        options:
+          command: "spotless:apply"
 
       - name: all_tests_validation
         description: "Validate all tests pass with test patch"
@@ -130,7 +176,6 @@ evaluations:
           is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.all_tests }}"
           expect_pass: true
-          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
 
     # Execution options
     parallel: true               # Run evaluations in parallel

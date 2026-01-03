@@ -94,7 +94,6 @@ evaluations:
           build_system: "{{ instance.build_system }}"
           is_maven: "{{ instance.is_maven }}"
           tests: '*'
-          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
           expect_pass: true
 
       - name: collect_prediction
@@ -113,6 +112,30 @@ evaluations:
           patch: "{{ prediction_patch }}"
           can_skip_patch: true
 
+      - name: "Apply gradle format spotless"
+        type: gradle_command
+        is_terminal: false
+        options:
+          command: "spotlessApply"
+
+      - name: "Apply gradle format"
+        type: gradle_command
+        is_terminal: false
+        options:
+          command: "format"
+
+      - name: "Apply maven format"
+        type: maven_command
+        is_terminal: false
+        options:
+          command: "spring-javaformat:apply"
+
+      - name: "Apply maven format spotless"
+        type: maven_command
+        is_terminal: false
+        options:
+          command: "spotless:apply"
+
       - name: all_tests_validation
         description: "Validate all tests pass with test patch"
         type: jvm__test_runner
@@ -123,7 +146,6 @@ evaluations:
           is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.all_tests }}"
           expect_pass: true
-          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
 
       - name: test_patch_application
         description: "Apply test patch to test prediction with tests"
@@ -132,6 +154,30 @@ evaluations:
         options:
           patch: "{{ instance.test_patch }}"
           can_skip_patch: true
+
+      - name: "Apply gradle format spotless"
+        type: gradle_command
+        is_terminal: false
+        options:
+          command: "spotlessApply"
+
+      - name: "Apply gradle format"
+        type: gradle_command
+        is_terminal: false
+        options:
+          command: "format"
+
+      - name: "Apply maven format"
+        type: maven_command
+        is_terminal: false
+        options:
+          command: "spring-javaformat:apply"
+
+      - name: "Apply maven format spotless"
+        type: maven_command
+        is_terminal: false
+        options:
+          command: "spotless:apply"
 
       - name: all_tests_after_prediction
         description: "Run all tests after prediction for regression detection"
@@ -143,7 +189,6 @@ evaluations:
           is_maven: "{{ instance.is_maven }}"
           tests: '*'
           expect_pass: true
-          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
 
       - name: regression_detection
         description: "Detect test regressions compared to baseline"
@@ -221,6 +266,30 @@ evaluations:
         options:
           patch: "{{ prediction_patch }}"
           can_skip_patch: true
+
+      - name: "Apply gradle format spotless"
+        type: gradle_command
+        is_terminal: false
+        options:
+          command: "spotlessApply"
+
+      - name: "Apply gradle format"
+        type: gradle_command
+        is_terminal: false
+        options:
+          command: "format"
+
+      - name: "Apply maven format"
+        type: maven_command
+        is_terminal: false
+        options:
+          command: "spring-javaformat:apply"
+
+      - name: "Apply maven format spotless"
+        type: maven_command
+        is_terminal: false
+        options:
+          command: "spotless:apply"
 
       - name: all_tests_after_prediction
         description: "Run all tests after prediction for regression detection"
