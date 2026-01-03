@@ -94,6 +94,7 @@ evaluations:
           build_system: "{{ instance.build_system }}"
           is_maven: "{{ instance.is_maven }}"
           tests: '*'
+          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
           expect_pass: true
 
       - name: collect_prediction
@@ -122,6 +123,7 @@ evaluations:
           is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.all_tests }}"
           expect_pass: true
+          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
 
       - name: test_patch_application
         description: "Apply test patch to test prediction with tests"
@@ -141,6 +143,7 @@ evaluations:
           is_maven: "{{ instance.is_maven }}"
           tests: '*'
           expect_pass: true
+          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
 
       - name: regression_detection
         description: "Detect test regressions compared to baseline"

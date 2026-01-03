@@ -90,6 +90,7 @@ evaluations:
           is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.pass_to_pass }}"
           expect_pass: true
+          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
 
       - name: test_patch_application
         description: "Apply test patch from dataset"
@@ -109,6 +110,7 @@ evaluations:
           is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.fail_to_pass }}"
           expect_pass: false
+          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
 
       - name: apply_gold_patch
         description: "Apply gold patch to project"
@@ -128,6 +130,7 @@ evaluations:
           is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.all_tests }}"
           expect_pass: true
+          test_args: "-Dspotless.skip=true -DspotlessCheck.skip=true -Dspring-javaformat.skip=true -x checkFormat -x format"
 
     # Execution options
     parallel: true               # Run evaluations in parallel
