@@ -112,29 +112,15 @@ evaluations:
           patch: "{{ prediction_patch }}"
           can_skip_patch: true
 
-      - name: "Apply gradle format spotless"
-        type: gradle_command
+          # Custom formatters
+      - name: "Apply custom formatters"
+        type: jvm__formatter
         is_terminal: false
         options:
-          command: "spotlessApply"
-
-      - name: "Apply gradle format"
-        type: gradle_command
-        is_terminal: false
-        options:
-          command: "format"
-
-      - name: "Apply maven format"
-        type: maven_command
-        is_terminal: false
-        options:
-          command: "spring-javaformat:apply"
-
-      - name: "Apply maven format spotless"
-        type: maven_command
-        is_terminal: false
-        options:
-          command: "spotless:apply"
+          gradle_formatters: "spotlessApply, format, googleJavaFormat"
+          maven_formatters: "spotless:apply, spring-javaformat:apply, fmt:format"
+          stop_on_first_success: true
+          timeout: 300
 
       - name: all_tests_validation
         description: "Validate all tests pass with test patch"
@@ -155,29 +141,15 @@ evaluations:
           patch: "{{ instance.test_patch }}"
           can_skip_patch: true
 
-      - name: "Apply gradle format spotless"
-        type: gradle_command
+          # Custom formatters
+      - name: "Apply custom formatters"
+        type: jvm__formatter
         is_terminal: false
         options:
-          command: "spotlessApply"
-
-      - name: "Apply gradle format"
-        type: gradle_command
-        is_terminal: false
-        options:
-          command: "format"
-
-      - name: "Apply maven format"
-        type: maven_command
-        is_terminal: false
-        options:
-          command: "spring-javaformat:apply"
-
-      - name: "Apply maven format spotless"
-        type: maven_command
-        is_terminal: false
-        options:
-          command: "spotless:apply"
+          gradle_formatters: "spotlessApply, format, googleJavaFormat"
+          maven_formatters: "spotless:apply, spring-javaformat:apply, fmt:format"
+          stop_on_first_success: true
+          timeout: 300
 
       - name: all_tests_after_prediction
         description: "Run all tests after prediction for regression detection"
@@ -267,29 +239,15 @@ evaluations:
           patch: "{{ prediction_patch }}"
           can_skip_patch: true
 
-      - name: "Apply gradle format spotless"
-        type: gradle_command
+          # Custom formatters
+      - name: "Apply custom formatters"
+        type: jvm__formatter
         is_terminal: false
         options:
-          command: "spotlessApply"
-
-      - name: "Apply gradle format"
-        type: gradle_command
-        is_terminal: false
-        options:
-          command: "format"
-
-      - name: "Apply maven format"
-        type: maven_command
-        is_terminal: false
-        options:
-          command: "spring-javaformat:apply"
-
-      - name: "Apply maven format spotless"
-        type: maven_command
-        is_terminal: false
-        options:
-          command: "spotless:apply"
+          gradle_formatters: "spotlessApply, format, googleJavaFormat"
+          maven_formatters: "spotless:apply, spring-javaformat:apply, fmt:format"
+          stop_on_first_success: true
+          timeout: 300
 
       - name: all_tests_after_prediction
         description: "Run all tests after prediction for regression detection"
