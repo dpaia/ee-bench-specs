@@ -36,24 +36,17 @@ environment:
     type: docker          # docker or local
 
     docker:
-      privileged: true    # Required for DinD
+      privileged: true
       cache: true
       network: bridge
-      # No volume mount needed - we'll run Docker daemon inside the container
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
 
     # Sandbox environment variables (shared across docker/local)
     env:
-      # Docker-in-Docker configuration for Testcontainers
-      DOCKER_HOST: "unix:///var/run/docker.sock"
-      # Force Testcontainers to use Unix socket strategy (not DockerDesktop)
-      TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: "/var/run/docker.sock"
-      TESTCONTAINERS_HOST_OVERRIDE: "unix:///var/run/docker.sock"
       TESTCONTAINERS_RYUK_DISABLED: "true"
       TESTCONTAINERS_CHECKS_DISABLE: "true"
-      TZ: "UTC"
-      LANGFUSE_HOST: "{{ env.LANGFUSE_HOST }}"
-      LANGFUSE_SECRET_KEY: "{{ env.LANGFUSE_SECRET_KEY }}"
-      LANGFUSE_PUBLIC_KEY: "{{ env.LANGFUSE_PUBLIC_KEY }}"
+      DOCKER_HOST: "unix:///var/run/docker.sock"
 
   # Workspace directory
   workspace_dir: "/workspace"

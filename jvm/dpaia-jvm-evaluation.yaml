@@ -47,7 +47,6 @@ environment:
       TESTCONTAINERS_RYUK_DISABLED: "true"
       TESTCONTAINERS_CHECKS_DISABLE: "true"
       DOCKER_HOST: "unix:///var/run/docker.sock"
-      TZ: "UTC"
 
   # Workspace directory
   workspace_dir: "/workspace"
