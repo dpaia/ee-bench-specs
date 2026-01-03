@@ -67,8 +67,8 @@ evaluations:
     evaluators:
       - name: project_reset
         description: "Reset project to original state"
-        type: project_reset       # factory name
-        is_terminal: false        # Not a terminal evaluator
+        type: project_reset
+        is_terminal: false
         max_score: 0
         timeout: 200
 
@@ -91,7 +91,6 @@ evaluations:
         options:
           patch: "{{ instance.test_patch }}"
 
-          # Custom formatters
       - name: "Apply custom formatters"
         type: jvm__formatter
         is_terminal: false
@@ -113,6 +112,13 @@ evaluations:
           tests: "{{ instance.fail_to_pass }}"
           expect_pass: false
 
+      - name: project_reset
+        description: "Reset project to original state"
+        type: project_reset
+        is_terminal: false
+        max_score: 0
+        timeout: 200
+
       - name: apply_gold_patch
         description: "Apply gold patch to project"
         type: patch_application
@@ -121,7 +127,13 @@ evaluations:
           patch: "{{ instance.patch }}"
           can_skip_patch: true
 
-          # Custom formatters
+      - name: test_patch_application
+        description: "Apply test patch from dataset"
+        type: patch_application
+        is_terminal: true
+        options:
+          patch: "{{ instance.test_patch }}"
+
       - name: "Apply custom formatters"
         type: jvm__formatter
         is_terminal: false

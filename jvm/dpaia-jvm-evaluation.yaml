@@ -111,6 +111,14 @@ evaluations:
           patch: "{{ prediction_patch }}"
           can_skip_patch: true
 
+      - name: test_patch_application
+        description: "Apply test patch to test prediction with tests"
+        type: patch_application
+        is_terminal: true
+        options:
+          patch: "{{ instance.test_patch }}"
+          can_skip_patch: true
+
           # Custom formatters
       - name: "Apply custom formatters"
         type: jvm__formatter
@@ -131,24 +139,6 @@ evaluations:
           is_maven: "{{ instance.is_maven }}"
           tests: "{{ instance.all_tests }}"
           expect_pass: true
-
-      - name: test_patch_application
-        description: "Apply test patch to test prediction with tests"
-        type: patch_application
-        is_terminal: true
-        options:
-          patch: "{{ instance.test_patch }}"
-          can_skip_patch: true
-
-          # Custom formatters
-      - name: "Apply custom formatters"
-        type: jvm__formatter
-        is_terminal: false
-        options:
-          gradle_formatters: "spotlessApply, format, googleJavaFormat"
-          maven_formatters: "spotless:apply, spring-javaformat:apply, fmt:format"
-          stop_on_first_success: true
-          timeout: 300
 
       - name: all_tests_after_prediction
         description: "Run all tests after prediction for regression detection"
@@ -238,7 +228,6 @@ evaluations:
           patch: "{{ prediction_patch }}"
           can_skip_patch: true
 
-          # Custom formatters
       - name: "Apply custom formatters"
         type: jvm__formatter
         is_terminal: false
@@ -248,15 +237,6 @@ evaluations:
           stop_on_first_success: true
           timeout: 300
 
-      - name: all_tests_after_prediction
-        description: "Run all tests after prediction for regression detection"
-        type: jvm__test_runner
-        is_terminal: false
-        timeout: 600
-        options:
-          tests: '*'
-          expect_pass: true
-
       - name: all_tests_validation
         description: "Validate all tests pass with test patch"
         type: jvm__test_runner
@@ -264,6 +244,15 @@ evaluations:
         timeout: 600
         options:
           tests: "{{ instance.all_tests }}"
+          expect_pass: true
+
+      - name: all_tests_after_prediction
+        description: "Run all tests after prediction for regression detection"
+        type: jvm__test_runner
+        is_terminal: false
+        timeout: 600
+        options:
+          tests: '*'
           expect_pass: true
 
       - name: regression_detection
