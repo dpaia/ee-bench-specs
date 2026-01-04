@@ -233,7 +233,7 @@ environment:
 
 predictions:
   # Claude Code IDE agent predictions
-  - id: blind-idea
+  - id: blind
     name: Agent Blind Prediction (Claude Code IDE)
     source: agent-code
     agent: "claude-code-idea-mcp"
@@ -245,10 +245,10 @@ predictions:
       {{ instance.problem_statement }}
 
     output:
-      path: result/{{ instance.instance_id }}/claude-code-ide-blind-predictions.json
+      path: result/{{ instance.instance_id }}/claude-code-blind-predictions.json
       pretty: true
 
-  - id: informed-idea
+  - id: informed
     name: Agent Informed Prediction (Claude Code IDE)
     source: agent-test
     agent: "claude-code-idea-mcp"
@@ -266,7 +266,7 @@ predictions:
       {{ instance.pass_to_pass }}
 
     output:
-      path: result/{{ instance.instance_id }}/claude-code-ide-informed-predictions.json
+      path: result/{{ instance.instance_id }}/claude-code-informed-predictions.json
       pretty: true
 
 # Log configuration (Logging)
