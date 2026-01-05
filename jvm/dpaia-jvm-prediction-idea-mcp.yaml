@@ -19,10 +19,10 @@ metadata:
 # Agent configuration - define one or more agents
 agents:
   # Claude Code IDE Agent
-  - name: "claude-code-idea-mcp"
+  - name: "agent-idea-mcp"
     description: "Claude Code assistant with IntelliJ IDEA MCP server integration. Provides AI-powered code assistance with IDE capabilities through MCP."
     version: "latest"
-    type: "claude-code" # To reuse agent result parser and features from claude code agent
+    type: "{{ agent }}" # To reuse agent result parser and features from claude code agent
     primary: true
     role: "code-assistant"
     timeout: 1800
@@ -53,7 +53,7 @@ agents:
         fi
 
         # Output combined version
-        echo "claude-code-ide: Claude=$CLAUDE_VERSION, IDEA=$IDEA_VERSION"
+        echo "{{ agent }}-ide: Claude=$CLAUDE_VERSION, IDEA=$IDEA_VERSION"
 
     entry_command:
       type: shell
@@ -84,7 +84,7 @@ agents:
         # Run Claude Code with MCP configuration
         # The MCP tools path is automatically configured by the MCP feature system
         set +e
-        claude-code "$@"
+        agent-code "$@"
         CLAUDE_EXIT_CODE=$?
         set -e
 
@@ -108,20 +108,21 @@ agents:
         echo "=== Agent Complete ==="
         exit $CLAUDE_EXIT_CODE
 
-    entry_command_alias: "claude-code-idea"
+    entry_command_alias: "agent-idea"
 
     # Environment variables
     env:
       TARGET_PROJECT: "/workspace/task_project"
 
     dependencies:
-      - name: "claude-code"
+      - name: "agent"
         version: "latest"
-        type: "claude-code"
+        type: "{{ agent }}"
+        entry_command_alias: "agent-code"
 
       - name: "idea-mcp-server"
         type: "idea-mcp-server"
-        version: 253
+        version: "253"
         options:
           edition: ultimate
           project_warmup: true
@@ -136,14 +137,14 @@ agents:
           tags:
             - "dpaia"
             - "jvm"
-            - "claude-code"
+            - "{{ agent }}"
             - "idea-mcp-server"
             - "{{ instance.instance_id }}"
             - "{{ instance.build_system }}"
             - "{{ instance.language }}"
           metadata:
             instance_id: "{{ instance.instance_id }}"
-            agent: "claude-code-idea-mcp"
+            agent: "agent-idea-mcp"
             repo: "{{ instance.repo }}"
             base_commit: "{{ instance.base_commit }}"
             problem_statement: "{{ instance.problem_statement }}"
@@ -236,7 +237,7 @@ predictions:
   - id: blind
     name: Agent Blind Prediction (Claude Code IDE)
     source: agent-code
-    agent: "claude-code-idea-mcp"
+    agent: "agent-idea-mcp"
     prompt: |
       Fix the following issue by making code changes. You have access to IntelliJ IDEA
       through its MCP server for advanced code analysis and refactoring capabilities.
@@ -245,13 +246,13 @@ predictions:
       {{ instance.problem_statement }}
 
     output:
-      path: result/{{ instance.instance_id }}/claude-code-blind-predictions.json
+      path: result/{{ instance.instance_id }}/{{ agent }}-blind-predictions.json
       pretty: true
 
   - id: informed
     name: Agent Informed Prediction (Claude Code IDE)
     source: agent-test
-    agent: "claude-code-idea-mcp"
+    agent: "agent-idea-mcp"
     prompt: |
       Fix the following issue by making code changes. You have access to IntelliJ IDEA
       through its MCP server and test information to guide your fix.
@@ -266,7 +267,7 @@ predictions:
       {{ instance.pass_to_pass }}
 
     output:
-      path: result/{{ instance.instance_id }}/claude-code-informed-predictions.json
+      path: result/{{ instance.instance_id }}/{{ agent }}-informed-predictions.json
       pretty: true
 
 # Log configuration (Logging)
