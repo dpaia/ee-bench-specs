@@ -18,18 +18,17 @@ metadata:
 
 # Agent configuration - define one or more agents
 agents:
-  # Claude Code IDE Agent
   - name: "agent-idea-mcp"
-    description: "Claude Code assistant with IntelliJ IDEA MCP server integration. Provides AI-powered code assistance with IDE capabilities through MCP."
+    description: "Agent with IntelliJ IDEA MCP server integration. Provides AI-powered code assistance with IDE capabilities through MCP."
     version: "latest"
-    type: "{{ agent }}" # To reuse agent result parser and features from claude code agent
+    type: "{{ agent }}" # To reuse agent result parser and features from agent
     primary: true
     role: "code-assistant"
     timeout: 1800
 
     install_command:
       shell: |
-        echo "Claude Code IDE Agent is already installed as dependency"
+        echo "Agent is already installed as dependency"
 
     version_command:
       type: shell
@@ -37,12 +36,11 @@ agents:
       content: |
         #!/bin/bash
         set -e
-
-        # Get Claude Code version
-        if command -v claude &> /dev/null; then
-            CLAUDE_VERSION=$(claude --version 2>&1)
+        
+        if command -v agent-code &> /dev/null; then
+            AGENT_VERSION=$(agent-code --version 2>&1)
         else
-            CLAUDE_VERSION="not installed"
+            AGENT_VERSION="not installed"
         fi
 
         # Get IDEA version (if available)
@@ -53,18 +51,17 @@ agents:
         fi
 
         # Output combined version
-        echo "{{ agent }}-ide: Claude=$CLAUDE_VERSION, IDEA=$IDEA_VERSION"
+        echo "{{ agent }}-ide: {{ agent }}=$AGENT_VERSION, IDEA=$IDEA_VERSION"
 
     entry_command:
       type: shell
       #language=bash
       content: |
         #!/bin/bash
-        # Execution script for Claude Code IDEA Agent
+        # Execution script for agent with IDEA MCP
 
         set -e
-
-        echo "=== Claude Code IDEA Agent ==="
+        
         echo "Project: $TARGET_PROJECT"
         echo ""
 
@@ -77,36 +74,30 @@ agents:
             exit 1
         fi
         echo ""
+        
+        echo "→ Starting {{ agent }}..."
 
-        # Run Claude Code
-        echo "→ Starting Claude Code..."
-
-        # Run Claude Code with MCP configuration
-        # The MCP tools path is automatically configured by the MCP feature system
+        # Run {{ agent }} with MCP configuration        
         set +e
         agent-code "$@"
-        CLAUDE_EXIT_CODE=$?
+        AGENT_EXIT_CODE=$?
         set -e
 
         echo ""
-        if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-            echo "✓ Claude Code finished (exit code: $CLAUDE_EXIT_CODE)"
+        if [ $AGENT_EXIT_CODE -eq 0 ]; then
+            echo "✓ {{ agent }} finished (exit code: $AGENT_EXIT_CODE)"
         else
-            echo "✗ Claude Code failed (exit code: $CLAUDE_EXIT_CODE)"
+            echo "✗ {{ agent }} failed (exit code: $AGENT_EXIT_CODE)"
         fi
         echo ""
 
-        # Stop IDEA MCP server (ignore any errors)
+        # Stop IDEA MCP server
         echo "→ Stopping IDEA..."
-        if idea-mcp-server stop 2>&1 | grep -E "IDEA stopped|not running" > /dev/null; then
-            echo "✓ IDEA stopped"
-        else
-            echo "✗ Failed to stop IDEA (ignoring error)"
-        fi
+        idea-mcp-server stop &>/dev/null &
 
         echo ""
-        echo "=== Agent Complete ==="
-        exit $CLAUDE_EXIT_CODE
+        echo "✓ Agent Complete"
+        exit $AGENT_EXIT_CODE
 
     entry_command_alias: "agent-idea"
 
@@ -233,9 +224,8 @@ environment:
       type: agents
 
 predictions:
-  # Claude Code IDE agent predictions
   - id: blind
-    name: Agent Blind Prediction (Claude Code IDE)
+    name: Agent Blind Prediction
     source: agent-code
     agent: "agent-idea-mcp"
     prompt: |
@@ -250,7 +240,7 @@ predictions:
       pretty: true
 
   - id: informed
-    name: Agent Informed Prediction (Claude Code IDE)
+    name: Agent Informed Prediction
     source: agent-test
     agent: "agent-idea-mcp"
     prompt: |
@@ -273,7 +263,7 @@ predictions:
 # Log configuration (Logging)
 log:
   # Logging options
-  # verbose: true                # Verbose output mode
+  verbose: true                # Verbose output mode
   log_file: logs/log.log       # Log file path
 
 options:
