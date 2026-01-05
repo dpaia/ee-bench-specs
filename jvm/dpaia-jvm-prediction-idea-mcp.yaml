@@ -199,8 +199,6 @@ environment:
       TESTCONTAINERS_RYUK_DISABLED: "true"
       TESTCONTAINERS_CHECKS_DISABLE: "true"
       DOCKER_HOST: "unix:///var/run/docker.sock"
-      TZ: "UTC"
-      ANTHROPIC_API_KEY: "{{ env.ANTHROPIC_API_KEY }}"
       # Telemetry bridge configuration (enables langfuse-telemetry-bridge integration)
       LANGFUSE_HOST: "{{ env.LANGFUSE_HOST }}"
       LANGFUSE_SECRET_KEY: "{{ env.LANGFUSE_SECRET_KEY }}"
