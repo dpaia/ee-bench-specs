@@ -1,0 +1,323 @@
+# DPAIA JVM Code Review Evaluation Configuration
+#
+# This configuration uses an LLM agent (agent_evaluator) to perform
+# code review evaluation on predictions.
+#
+# Usage:
+#   ee-bench --config specs/jvm/dpaia-jvm-code-review.yaml run-evaluation
+
+version: "1.0"
+spec: jvm
+name: "Code Review Evaluation for DPAIA"
+description: "Evaluate predictions using LLM-as-a-judge code review"
+tags:
+  - jvm
+  - code-review
+  - llm-judge
+
+metadata:
+  author: "DPAIA"
+
+# Agent configuration - uses {{ reviewer-agent }} from options (default: claude-code)
+agents:
+  - name: "code-reviewer"
+    type: "{{ reviewer-agent }}"
+    description: "CLI agent for code review"
+    version: "latest"
+    primary: true
+    timeout: 1800
+
+# Dataset configuration
+dataset:
+  source:
+    type: "http"
+    format: "json"
+    uri: "{{ dataset_uri }}"
+
+  cache: true
+
+# Environment configuration
+environment:
+  sandbox:
+    type: docker
+
+    docker:
+      privileged: true
+      cache: true
+      network: bridge
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+      TESTCONTAINERS_CHECKS_DISABLE: "true"
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+      TZ: "UTC"
+      LANGFUSE_HOST: "{{ env.LANGFUSE_HOST }}"
+      LANGFUSE_SECRET_KEY: "{{ env.LANGFUSE_SECRET_KEY }}"
+      LANGFUSE_PUBLIC_KEY: "{{ env.LANGFUSE_PUBLIC_KEY }}"
+
+  workspace_dir: "/workspace"
+  project_dir: "/workspace/task_project"
+
+  image: "{{ instance.instance_id }}:dependencies"
+
+  configurers:
+    - name: "agent-configurator"
+      description: "Configure agent environment"
+      type: agents
+
+# Predictions to evaluate
+predictions:
+  - id: agent-prediction
+    name: Agent Prediction
+    source: file
+    file:
+      path: result/{{ instance.instance_id }}/{{ agent }}-blind-predictions.json
+      format: json
+
+# Evaluation configuration with code review
+evaluations:
+  - id: code-review
+    name: Code Review Evaluation
+
+    evaluators:
+      # Reset project to original state
+      - name: project_reset
+        description: "Reset project to original state"
+        type: project_reset
+        is_terminal: false
+        max_score: 0
+        timeout: 200
+
+      # Collect and apply prediction
+      - name: collect_prediction
+        description: "Collect prediction patch"
+        type: prediction_application
+        is_terminal: true
+        options:
+          prediction: agent-prediction
+          output: "prediction_patch"
+
+      - name: apply_prediction
+        description: "Apply prediction patch to project"
+        type: patch_application
+        is_terminal: true
+        options:
+          patch: "{{ prediction_patch }}"
+          can_skip_patch: true
+
+      # LLM Code Review Evaluation
+      - name: code_quality_review
+        description: "LLM-based code quality review"
+        type: agent_evaluator
+        is_terminal: true
+        max_score: 50
+        timeout: 1800
+        options:
+          agent: "{{ agent }}"
+          prompt: |
+            You are a senior software engineer performing a code review.
+
+            ## Task Context
+
+            **Repository**: {{ instance.repo }}
+            **Problem Statement**:
+            {{ instance.problem_statement }}
+
+            ## Your Task
+
+            Review the code changes in the project directory: {{ env_config.project_dir }}
+
+            Evaluate the code based on these criteria:
+
+            1. **Correctness** (0-100): Does the change correctly address the problem statement?
+               - Does it fix the reported issue?
+               - Are edge cases handled?
+               - Is the logic sound?
+
+            2. **Code Quality** (0-100): Is the code well-written?
+               - Is it readable and maintainable?
+               - Does it follow coding conventions?
+               - Is it properly structured?
+
+            3. **Test Coverage** (0-100): Are changes adequately tested?
+               - Are new tests added where appropriate?
+               - Do existing tests still pass?
+               - Are edge cases tested?
+
+            4. **Impact Assessment** (0-100): What is the overall impact?
+               - Are there any regressions introduced?
+               - Is the change minimal and focused?
+               - Does it avoid unnecessary modifications?
+
+            Use `git diff HEAD~1` to see the changes made.
+
+          append_json_schema: true
+          directory: "{{ env_config.project_dir }}"
+
+      # Run tests to verify correctness
+      - name: test_validation
+        description: "Validate tests pass after changes"
+        type: jvm__test_runner
+        is_terminal: true
+        max_score: 50
+        timeout: 600
+        options:
+          build_system: "{{ instance.build_system }}"
+          is_maven: "{{ instance.is_maven }}"
+          tests: "{{ instance.all_tests }}"
+          expect_pass: true
+
+    parallel: false
+    timeout: 3600
+
+    scoring:
+      method: weighted_sum
+      weights:
+        code_quality_review: 0.5   # 50% weight for LLM review
+        test_validation: 0.5       # 50% weight for test results
+      normalize: 100
+      aggregation: mean
+
+    output:
+      path: result/{{ agent }}-code-review-evaluation.json
+      format: json
+      pretty: true
+      results_key: code_review
+      fields:
+        prediction: "{{ agent }}"
+        eval_name: "Code Review Score"
+        instance_id: "{{ instance.instance_id }}"
+        repo: "{{ instance.repo }}"
+        base_commit: "{{ instance.base_commit }}"
+        problem_statement: "{{ instance.problem_statement }}"
+
+# Alternative evaluation: Code review only (no tests)
+  - id: code-review-only
+    name: Code Review Only (No Tests)
+
+    evaluators:
+      - name: project_reset
+        description: "Reset project to original state"
+        type: project_reset
+        is_terminal: false
+        max_score: 0
+        timeout: 200
+
+      - name: collect_prediction
+        description: "Collect prediction patch"
+        type: prediction_application
+        is_terminal: true
+        options:
+          prediction: agent-prediction
+          output: "prediction_patch"
+
+      - name: apply_prediction
+        description: "Apply prediction patch to project"
+        type: patch_application
+        is_terminal: true
+        options:
+          patch: "{{ prediction_patch }}"
+          can_skip_patch: true
+
+      # LLM Code Review - Full evaluation with detailed prompt
+      - name: comprehensive_review
+        description: "Comprehensive LLM code review"
+        type: agent_evaluator
+        is_terminal: false
+        max_score: 100
+        timeout: 2400
+        options:
+          # Agent with custom timeout override
+          agent:
+            name: "{{ agent }}"
+            timeout: 2400
+
+          # Load prompt from file (alternative to inline)
+          # prompt:
+          #   type: file
+          #   path: prompts/code-review-prompt.md
+
+          prompt: |
+            You are an expert code reviewer evaluating a bug fix submission.
+
+            ## Context
+
+            **Repository**: {{ instance.repo }}
+            **Commit**: {{ instance.base_commit }}
+
+            **Problem Statement**:
+            {{ instance.problem_statement }}
+
+            **Expected Tests to Pass**:
+            {{ instance.fail_to_pass }}
+
+            **Tests That Must Not Regress**:
+            {{ instance.pass_to_pass }}
+
+            ## Instructions
+
+            1. Navigate to {{ env_config.project_dir }}
+            2. Run `git diff HEAD~1` to see the changes
+            3. Analyze the code changes thoroughly
+            4. Optionally run tests: `{{ instance.build_system }} test`
+
+            ## Evaluation Criteria
+
+            Score each criterion from 0-100:
+
+            ### 1. Bug Fix Correctness
+            - Does the change actually fix the reported bug?
+            - Is the root cause properly addressed?
+            - Will the fix work in all scenarios described?
+
+            ### 2. Code Quality
+            - Is the code clean and readable?
+            - Are variable/function names meaningful?
+            - Is the code properly documented where needed?
+            - Does it follow the project's coding style?
+
+            ### 3. Minimal Change Principle
+            - Is the change focused on the bug fix?
+            - Are there unnecessary modifications?
+            - Is the solution appropriately scoped?
+
+            ### 4. Potential Side Effects
+            - Could this change break other functionality?
+            - Are there any edge cases not handled?
+            - Is error handling appropriate?
+
+            ### 5. Test Quality (if tests are modified/added)
+            - Are new tests comprehensive?
+            - Do they test the bug fix specifically?
+            - Are edge cases covered?          
+
+    parallel: false
+    timeout: 3000
+
+    scoring:
+      method: sum
+      normalize: 100
+      aggregation: mean
+
+    output:
+      path: result/{{ agent }}-code-review-only.json
+      format: json
+      pretty: true
+      results_key: code_review_only
+      fields:
+        prediction: "{{ agent }}"
+        eval_name: "Code Review Only Score"
+        instance_id: "{{ instance.instance_id }}"
+        repo: "{{ instance.repo }}"
+
+# Log configuration
+log:
+  verbose: true
+  quiet: false
+  log_file: logs/code-review.log
+
+options:
+  reviewer-agent: claude-code
+  dataset_uri: "https://raw.githubusercontent.com/dpaia/ee-dataset/refs/tags/{{ dataset_version | default('v20251028') }}/datasets/java-spring-ee-dataset.json"
