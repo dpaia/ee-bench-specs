@@ -108,9 +108,14 @@ environment:
 
   # Environment configurers
   configurers:
-    - name: "agent-configurator"
-      description: "Configure agent environment"
+    - name: "Configure agent"
       type: agents
+      image:
+        build: true
+        force: true
+        name: "{{ instance.instance_id }}:{{ agent }}"
+      options:
+        agents: "{{ agent }}"
 
 predictions:
   - id: blind

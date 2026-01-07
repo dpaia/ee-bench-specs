@@ -18,106 +18,21 @@ metadata:
 
 # Agent configuration - define one or more agents
 agents:
-  - name: "agent-idea-mcp"
-    description: "Agent with IntelliJ IDEA MCP server integration. Provides AI-powered code assistance with IDE capabilities through MCP."
+  - name: "idea-mcp-server"
+    type: "idea-mcp-server"
+    version: "253"
+    options:
+      edition: ultimate
+      project_warmup: true
+
+  - name: "{{ agent }}"
+    type: "{{ agent }}"
+    description: "CLI agent"
     version: "latest"
-    type: "{{ agent }}" # To reuse agent result parser and features from agent
     primary: true
-    role: "code-assistant"
     timeout: 1800
 
-    install_command:
-      shell: |
-        echo "Agent is already installed as dependency"
-
-    version_command:
-      type: shell
-      #language=bash
-      content: |
-        #!/bin/bash
-        set -e
-        
-        if command -v agent-code &> /dev/null; then
-            AGENT_VERSION=$(agent-code --version 2>&1)
-        else
-            AGENT_VERSION="not installed"
-        fi
-
-        # Get IDEA version (if available)
-        if command -v idea &> /dev/null; then
-            IDEA_VERSION=$(idea --version 2>&1 || echo "unknown")
-        else
-            IDEA_VERSION="not available"
-        fi
-
-        # Output combined version
-        echo "{{ agent }}-ide: {{ agent }}=$AGENT_VERSION, IDEA=$IDEA_VERSION"
-
-    entry_command:
-      type: shell
-      #language=bash
-      content: |
-        #!/bin/bash
-        # Execution script for agent with IDEA MCP
-
-        set -e
-        
-        echo "Project: $TARGET_PROJECT"
-        echo ""
-
-        # Start IDEA MCP server and open project
-        echo "→ Starting IDEA MCP Server..."
-        if idea-mcp-server open "$TARGET_PROJECT" 2>&1 | grep -E "Starting IDEA|MCP endpoint ready|MCP Server started|already running|Command sent" | sed 's/\[INFO\] //g'; then
-            echo "✓ IDEA MCP Server ready at http://localhost:64342/sse"
-        else
-            echo "✗ Failed to start IDEA MCP Server"
-            exit 1
-        fi
-        echo ""
-        
-        echo "→ Starting {{ agent }}..."
-
-        # Run {{ agent }} with MCP configuration        
-        set +e
-        agent-code "$@"
-        AGENT_EXIT_CODE=$?
-        set -e
-
-        echo ""
-        if [ $AGENT_EXIT_CODE -eq 0 ]; then
-            echo "✓ {{ agent }} finished (exit code: $AGENT_EXIT_CODE)"
-        else
-            echo "✗ {{ agent }} failed (exit code: $AGENT_EXIT_CODE)"
-        fi
-        echo ""
-
-        # Stop IDEA MCP server
-        echo "→ Stopping IDEA..."
-        idea-mcp-server stop &>/dev/null &
-
-        echo ""
-        echo "✓ Agent Complete"
-        exit $AGENT_EXIT_CODE
-
-    entry_command_alias: "agent-idea"
-
-    # Environment variables
-    env:
-      TARGET_PROJECT: "/workspace/task_project"
-
     dependencies:
-      - name: "agent"
-        version: "latest"
-        type: "{{ agent }}"
-        entry_command_alias: "agent-code"
-
-      - name: "idea-mcp-server"
-        type: "idea-mcp-server"
-        version: "253"
-        options:
-          edition: ultimate
-          project_warmup: true
-
       - name: "langfuse-telemetry-bridge"
         version: "1.0.0"
         options:
@@ -135,7 +50,8 @@ agents:
             - "{{ instance.language }}"
           metadata:
             instance_id: "{{ instance.instance_id }}"
-            agent: "agent-idea-mcp"
+            agent: "{{ agent }}"
+            mcp_server: "jetbrains-idea-253"
             repo: "{{ instance.repo }}"
             base_commit: "{{ instance.base_commit }}"
             problem_statement: "{{ instance.problem_statement }}"
@@ -217,15 +133,42 @@ environment:
 
   # Environment configurers
   configurers:
-    - name: "agent-configurator"
-      description: "Configure agent environment"
+    - name: "Configure IDEA environment"
       type: agents
+      image:
+        build: true
+        name: "{{ instance.instance_id }}:idea-253" #cache image with IDEA
+      options:
+        agents: "idea-mcp-server"
+
+    - name: "Configure agent"
+      type: agents
+      image:
+        build: true
+        force: true
+        name: "{{ instance.instance_id }}:{{ agent }}__idea-mcp-253"
+      options:
+        agents: "{{ agent }}"
+
+    - name: "Start IDEA MCP server and open project"
+      type: script
+      options:
+        #language=bash
+        shell: |
+          # Start IDEA MCP server and open project
+          echo "→ Starting IDEA MCP Server..."
+          if idea-mcp-server open "{{ env_config.project_dir }}" 2>&1 | grep -E "IDEA MCP Server started" | sed 's/\[INFO\] //g'; then
+            echo "✓ IDEA MCP Server ready at http://localhost:64342/sse"
+          else
+            echo "✗ Failed to start IDEA MCP Server"
+            exit 1
+          fi
 
 predictions:
   - id: blind
     name: Agent Blind Prediction
     source: agent-code
-    agent: "agent-idea-mcp"
+    agent: "{{ agent }}"
     prompt: |
       Fix the following issue by making code changes. You have access to IntelliJ IDEA
       through its MCP server for advanced code analysis and refactoring capabilities.
@@ -240,7 +183,7 @@ predictions:
   - id: informed
     name: Agent Informed Prediction
     source: agent-test
-    agent: "agent-idea-mcp"
+    agent: "{{ agent }}"
     prompt: |
       Fix the following issue by making code changes. You have access to IntelliJ IDEA
       through its MCP server and test information to guide your fix.
