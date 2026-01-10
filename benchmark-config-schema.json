@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/dpaia/ee-bench/schemas/benchmark-config.json",
   "title": "EE-Bench Benchmark Configuration Schema",
-  "description": "Schema for EE-Bench YAML configuration files that define complete evaluation specifications",
+  "description": "Schema for EE-Bench YAML configuration files that define complete evaluation specifications.\n\nTemplate/Variable Substitution:\n- Environment variables: ${VAR}, ${VAR:-default}, ${VAR:?error_msg}, ${VAR:+alt_value}\n- Jinja2-style templates: {{ var }}, {{ instance.field }}, {{ env.VAR }}\n- Instance field templates: {instance.repo}, {instance.base_commit}\n- CLI parameters merge into 'params' and are available for template resolution\n\nBackward Compatibility:\n- 'agents' can be a single object (converted to list)\n- 'output' key is alias for 'log' section\n- 'instance_filter' is alias for 'filters' in dataset\n- 'evaluation' (singular) is deprecated - use 'evaluations' (plural)",
   "type": "object",
   "required": ["version", "spec", "dataset"],
   "properties": {
@@ -54,11 +54,20 @@
       }
     },
     "agents": {
-      "type": "array",
-      "description": "Agent configurations for evaluation tasks. Multiple agents can be configured; the first or primary-marked agent is used for predictions.",
-      "items": {
-        "$ref": "#/definitions/AgentConfiguration"
-      }
+      "description": "Agent configurations for evaluation tasks. Multiple agents can be configured; the first or primary-marked agent is used for predictions. For backward compatibility, a single agent object is also accepted and converted to a list.",
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "List of agent configurations",
+          "items": {
+            "$ref": "#/definitions/AgentConfiguration"
+          }
+        },
+        {
+          "$ref": "#/definitions/AgentConfiguration",
+          "description": "Single agent configuration (backward compatibility - converted to list)"
+        }
+      ]
     },
     "predictions": {
       "type": "array",
@@ -114,6 +123,11 @@
       "$ref": "#/definitions/LogConfiguration",
       "description": "Logging configuration"
     },
+    "output": {
+      "$ref": "#/definitions/LogConfiguration",
+      "description": "DEPRECATED: Use 'log' instead. Alias for logging configuration (backward compatibility).",
+      "deprecated": true
+    },
     "options": {
       "$ref": "#/definitions/OptionsConfiguration",
       "description": "Advanced options for caching, concurrency, validation, and debugging"
@@ -131,7 +145,12 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Agent name (e.g., 'junie-idea', 'claude-code')"
+          "description": "Agent name/identifier (e.g., 'junie-idea', 'claude-code'). When 'type' is not specified, this is also used as the agent type. When 'type' is specified, 'name' is just a local identifier."
+        },
+        "type": {
+          "type": "string",
+          "description": "Agent factory type (e.g., 'claude-code', 'junie'). Used to resolve the actual agent from the registry. If not provided, 'name' is used as the agent type. Use this when you want to give the agent a custom identifier different from the actual agent type.",
+          "examples": ["claude-code", "junie", "gemini", "aider"]
         },
         "version": {
           "type": "string",
@@ -797,6 +816,16 @@
     "DatasetConfiguration": {
       "type": "object",
       "properties": {
+        "format": {
+          "type": "string",
+          "enum": ["json", "yaml"],
+          "description": "Dataset format (top-level shorthand). Can also be specified inside 'source'.",
+          "default": "json"
+        },
+        "spec": {
+          "type": "string",
+          "description": "Dataset specification type. Used to identify the dataset schema/format."
+        },
         "source": {
           "type": "object",
           "description": "Dataset source specification",
@@ -822,6 +851,19 @@
               "description": "URI to remote dataset resource"
             }
           }
+        },
+        "instance_ids": {
+          "type": "array",
+          "description": "Top-level shorthand for filters.instance_ids. Specific instance IDs to evaluate.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "instance_filter": {
+          "type": "object",
+          "description": "DEPRECATED: Use 'filters' instead. Legacy alias for filtering criteria.",
+          "deprecated": true,
+          "additionalProperties": true
         },
         "filters": {
           "type": "object",
@@ -1619,7 +1661,8 @@
             "jvm__test_runner",
             "patch_application",
             "prediction_application",
-            "regression_detection"
+            "regression_detection",
+            "agent_evaluator"
           ]
         },
         "description": {
@@ -1744,6 +1787,90 @@
                     "type": "boolean",
                     "description": "Allow skipping if patch is empty",
                     "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "agent_evaluator"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "type": "object",
+                "description": "Agent evaluator options for LLM-as-a-judge evaluation. Uses an LLM agent to evaluate code based on a configurable prompt.",
+                "required": ["agent", "prompt"],
+                "properties": {
+                  "agent": {
+                    "description": "Agent to use for evaluation. Can be a string (agent name from benchmark config agents list) or a full AgentConfiguration object with metadata overrides.",
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "Agent name from benchmark config agents list (e.g., 'claude-code')"
+                      },
+                      {
+                        "$ref": "#/definitions/AgentConfiguration",
+                        "description": "Full agent configuration with optional metadata overrides"
+                      }
+                    ]
+                  },
+                  "prompt": {
+                    "description": "Evaluation prompt. Can be inline text or a FileSource for loading from file/URL.",
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "Inline prompt text. Supports Jinja2 templates: {{ instance.problem_statement }}, {{ env_config.project_dir }}, {{ env.VAR }}"
+                      },
+                      {
+                        "type": "object",
+                        "description": "FileSource for loading prompt from file or URL",
+                        "required": ["type"],
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": ["file", "http"],
+                            "description": "Source type: 'file' for local files, 'http' for URLs"
+                          },
+                          "path": {
+                            "type": "string",
+                            "description": "Path to local prompt file (when type='file')"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "URL to fetch prompt from (when type='http')"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "description": "Agent execution timeout in seconds",
+                    "default": 1800,
+                    "minimum": 1
+                  },
+                  "directory": {
+                    "type": "string",
+                    "description": "Working directory for agent execution. Defaults to env_config.project_dir."
+                  },
+                  "max_score": {
+                    "type": "number",
+                    "description": "Maximum score for normalization. Agent scores are normalized to this value.",
+                    "default": 100.0,
+                    "minimum": 0
+                  },
+                  "append_json_schema": {
+                    "type": "boolean",
+                    "description": "Auto-append JSON response schema instructions to prompt. When true, adds expected JSON format with examples.",
+                    "default": true
                   }
                 }
               }
@@ -1973,7 +2100,7 @@
       }
     },
     "ScriptConfiguration": {
-      "description": "Script configuration supporting multiple formats: inline string, type aliases (shell, bash, python, etc.), or full script specification with files and environment.",
+      "description": "Script configuration supporting multiple formats: inline string, type aliases (shell, bash, python, etc.), or full script specification with files and environment. Supports environment variable substitution: ${VAR}, ${VAR:-default}, ${VAR:?error}, ${VAR:+alt}. Also supports Jinja2-style templates: {{ var }}.",
       "oneOf": [
         {
           "type": "string",
@@ -2028,12 +2155,19 @@
         {
           "type": "object",
           "description": "Full script specification with files, working directory, and environment",
-          "required": ["type"],
           "properties": {
             "type": {
               "type": "string",
               "enum": ["shell", "bash", "python", "java", "kotlin", "javascript", "ruby", "go"],
               "description": "Script type/language"
+            },
+            "name": {
+              "type": "string",
+              "description": "Script name (used when 'content' is provided instead of 'files')"
+            },
+            "content": {
+              "type": "string",
+              "description": "Inline script content (alternative to 'files' for single-file scripts). When used, 'name' specifies the script filename."
             },
             "files": {
               "type": "array",
@@ -2060,6 +2194,16 @@
                       "content": {
                         "type": "string",
                         "description": "Inline file content"
+                      },
+                      "executable": {
+                        "type": "boolean",
+                        "description": "Mark file as executable (chmod +x)",
+                        "default": false
+                      },
+                      "binary": {
+                        "type": "boolean",
+                        "description": "Mark file as binary (skip text encoding)",
+                        "default": false
                       }
                     }
                   }
@@ -2106,13 +2250,6 @@
               "description": "Script execution timeout in seconds",
               "minimum": 1,
               "examples": [300, 600, 1800]
-            },
-            "args": {
-              "type": "array",
-              "description": "Command-line arguments passed to the script",
-              "items": {
-                "type": "string"
-              }
             }
           }
         }
@@ -2131,9 +2268,14 @@
           "timeout": 600
         },
         {
+          "type": "bash",
+          "content": "#!/bin/bash\necho 'Installing...'",
+          "name": "install.sh"
+        },
+        {
           "type": "python",
           "files": [
-            {"name": "setup.py", "content": "print('setup')"}
+            {"name": "setup.py", "content": "print('setup')", "executable": true}
           ],
           "interpreter": "/usr/bin/python3.11",
           "interpreter_args": ["-u", "-W", "ignore"],
