@@ -56,14 +56,14 @@ environment:
   image: "{{ instance.instance_id }}:dependencies"
 
 predictions:
-  - id: agent-blind
+  - id: blind
     name: Agent Blind Predictions
     source: file
     file:
       path: result/{{ instance.instance_id }}/{{ agent }}-blind-predictions.json
       format: json
 
-  - id: agent-informed
+  - id: informed
     name: Agent Informed Predictions
     source: file
     file:
@@ -100,7 +100,7 @@ evaluations:
         type: prediction_application
         is_terminal: true
         options:
-          prediction: agent-blind
+          prediction: blind
           output: "prediction_patch"
 
       - name: apply_prediction
@@ -217,7 +217,7 @@ evaluations:
         type: prediction_application
         is_terminal: true
         options:
-          prediction: agent-informed
+          prediction: informed
           output: "prediction_patch"
 
       - name: apply_prediction
