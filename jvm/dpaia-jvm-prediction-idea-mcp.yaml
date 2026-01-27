@@ -32,13 +32,29 @@ agents:
     primary: true
     timeout: 1800
 
-    dependencies:
-      - name: "langfuse-telemetry-bridge"
-        version: "1.0.0"
-        options:
-          host: "$LANGFUSE_HOST"
-          private_key: "$LANGFUSE_SECRET_KEY"
+    # Features configuration (MCP, telemetry, etc.)
+    features:
+      # MCP servers configuration (connects to IDEA MCP server)
+      mcp:
+        method: "json"
+        servers:
+          jetbrains-idea:
+            type: "sse"
+            url: "http://127.0.0.1:64342/sse"
+            headers:
+              IJ_MCP_SERVER_project_dir: "/workspace/task_project"
+
+      # Telemetry configuration
+      telemetry:
+        enabled: true
+        log_prompts: true
+
+        langfuse:
+          enabled: true
           public_key: "$LANGFUSE_PUBLIC_KEY"
+          secret_key: "$LANGFUSE_SECRET_KEY"
+          host: "$LANGFUSE_HOST"
+
           name: "{{ instance.instance_id }}"
           tags:
             - "dpaia"
@@ -62,23 +78,6 @@ agents:
             version: "{{ instance.version }}"
             language: "{{ instance.language }}"
             build_system: "{{ instance.build_system }}"
-
-    # Features configuration (MCP, telemetry, etc.)
-    features:
-      # MCP servers configuration (connects to IDEA MCP server)
-      mcp:
-        servers:
-          jetbrains-idea:
-            type: "sse"
-            url: "http://127.0.0.1:64342/sse"
-            headers:
-              IJ_MCP_SERVER_project_dir: "/workspace/task_project"
-
-      # Telemetry configuration
-      telemetry:
-        enabled: true
-        bridge: true
-        log_prompts: true
 
     # Metadata
     metadata:
@@ -145,7 +144,6 @@ environment:
       type: agents
       image:
         build: true
-        force: true
         name: "{{ instance.instance_id }}:{{ agent }}__idea-mcp-253"
       options:
         agents: "{{ agent }}"
