@@ -1,0 +1,164 @@
+# Complete YAML Configuration Example
+#
+# This example demonstrates all available configuration options
+# for the ee-bench YAML configuration system.
+#
+# Usage:
+#   ee-bench --config examples/yaml-configs/complete.yaml --spec jvm run-evaluation
+
+version: "1.0"
+spec: jvm
+name: "Collect agent predictions for DPAIA benchmark"
+tags:
+  - jvm
+  - predictions
+
+metadata:
+  author: "DPAIA"
+
+# Agent configuration - define one or more agents
+agents:
+  # Primary agent
+  - name: "{{ agent }}"
+    description: "CLI agent"
+    version: "latest"
+    primary: true  # Mark as primary agent
+    timeout: 1800
+
+    features:
+      # Telemetry configuration
+      telemetry:
+        enabled: true
+        log_prompts: true
+
+        langfuse:
+          enabled: true
+          public_key: "$LANGFUSE_PUBLIC_KEY"
+          secret_key: "$LANGFUSE_SECRET_KEY"
+          host: "$LANGFUSE_HOST"
+
+          name: "{{ instance.instance_id }}"
+          tags:
+            - "dpaia"
+            - "jvm"
+            - "{{ agent }}"
+            - "{{ instance.instance_id }}"
+            - "{{ instance.build_system }}"
+            - "{{ instance.language }}"
+          metadata:
+            instance_id: "{{ instance.instance_id }}"
+            agent: "{{ agent }}"
+            repo: "{{ instance.repo }}"
+            base_commit: "{{ instance.base_commit }}"
+            problem_statement: "{{ instance.problem_statement }}"
+            fail_to_pass: "{{ instance.fail_to_pass }}"
+            pass_to_pass: "{{ instance.pass_to_pass }}"
+            issue_numbers: "{{ instance.issue_numbers }}"
+            tags: "{{ instance.tags }}"
+            version: "{{ instance.version }}"
+            language: "{{ instance.language }}"
+            build_system: "{{ instance.build_system }}"
+
+# Dataset configuration
+dataset:
+  source:
+    type: "http"
+    format: "json"
+    uri: "{{ dataset_uri }}"
+
+  # Dataset options
+  cache: true
+
+# Environment configuration
+environment:
+  # Load pre-configured environment (optional)
+  # config_path: environment-config.json
+
+  # Sandbox configuration
+  sandbox:
+    type: docker          # docker or local
+
+    docker:
+      privileged: true
+      cache: true
+      network: bridge
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+
+    # Sandbox environment variables (shared across docker/local)
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+      TESTCONTAINERS_CHECKS_DISABLE: "true"
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+      TZ: "UTC"
+      LANGFUSE_HOST: "{{ env.LANGFUSE_HOST }}"
+      LANGFUSE_SECRET_KEY: "{{ env.LANGFUSE_SECRET_KEY }}"
+      LANGFUSE_PUBLIC_KEY: "{{ env.LANGFUSE_PUBLIC_KEY }}"
+
+  # Workspace directory
+  workspace_dir: "/workspace"
+  project_dir: "/workspace/task_project"
+
+  # Docker image configuration (simple format)
+  image: "{{ instance.instance_id }}:dependencies"
+
+  # Build options
+  parallel: true          # Build environments in parallel
+  max_workers: 8          # Number of parallel workers
+
+  # Environment configurers
+  configurers:
+    - name: "Configure agent"
+      type: agents
+      image:
+        build: true
+        force: true
+        name: "{{ instance.instance_id }}:{{ agent }}"
+      options:
+        agents: "{{ agent }}"
+
+predictions:
+  - id: blind
+    name: Agent Blind Prediction
+    source: agent-code
+    agent: "{{ agent }}"
+    prompt: |
+      Fix the following issue by making code changes.
+
+      Problem Statement:
+      {{ instance.problem_statement }}
+
+    output:
+      path: result/{{ instance.instance_id }}/{{ agent }}-blind-predictions.json
+      pretty: true
+
+  - id: informed
+    name: Agent Informed Prediction
+    source: agent-test
+    agent: "{{ agent }}"
+    prompt: |
+      Fix the following issue by making code changes. You have access to test information.
+
+      Problem Statement:
+      {{ instance.problem_statement }}
+
+      Tests that should pass after the fix:
+      {{ instance.fail_to_pass }}
+
+      Tests that must continue passing:
+      {{ instance.pass_to_pass }}
+
+    output:
+      path: result/{{ instance.instance_id }}/{{ agent }}-informed-predictions.json
+      pretty: true
+
+# Log configuration (Logging)
+log:
+  # Logging options
+  verbose: true                # Verbose output mode
+  quiet: false                 # Minimal output mode
+  log_file: logs/log.log       # Log file path
+
+options:
+  agent: "claude-code"
+  dataset_uri: "https://raw.githubusercontent.com/dpaia/ee-dataset/refs/tags/{{ dataset_version | default('v20251028') }}/datasets/java-spring-ee-dataset.json"

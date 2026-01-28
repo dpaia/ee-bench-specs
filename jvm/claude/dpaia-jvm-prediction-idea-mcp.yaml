@@ -206,4 +206,5 @@ log:
   log_file: logs/log.log       # Log file path
 
 options:
+  agent: "claude-code"
   dataset_uri: "https://raw.githubusercontent.com/dpaia/ee-dataset/refs/tags/{{ dataset_version | default('v20251028') }}/datasets/java-spring-ee-dataset.json"
