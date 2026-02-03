@@ -158,7 +158,7 @@ evaluations:
     parallel: true               # Run evaluations in parallel
     max_workers: 4               # Number of parallel evaluators
     timeout: 3600                # Total evaluation timeout
-    fail_fast: true              # Stop evaluation on first failure
+#    fail_fast: true              # Stop evaluation on first failure
 
     # Scoring configuration
     scoring:
