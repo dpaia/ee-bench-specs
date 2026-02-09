@@ -25,7 +25,7 @@
 #     run-evaluation
 
 version: "1.0"
-spec: python
+spec: swe-pro
 name: "Evaluate SWE-bench Pro predictions"
 description: "Evaluate agent predictions for SWE-bench Pro Python instances (blind and informed)"
 tags:

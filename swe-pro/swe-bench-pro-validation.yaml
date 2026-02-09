@@ -20,7 +20,7 @@
 #     run-evaluation
 
 version: "1.0"
-spec: python
+spec: swe-pro
 name: "Validate SWE-bench Pro datapoints"
 tags:
   - python

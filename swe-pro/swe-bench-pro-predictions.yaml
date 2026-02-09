@@ -7,7 +7,7 @@
 #   ee-bench --config specs/python/swe-bench-pro-predictions.yaml --spec python run-evaluation
 
 version: "1.0"
-spec: python
+spec: swe-pro
 name: "Collect agent predictions for SWE-bench Pro"
 tags:
   - python
