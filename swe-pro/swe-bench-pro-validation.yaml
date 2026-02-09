@@ -1,0 +1,175 @@
+# SWE-bench Pro Datapoint Validation (Pre-built Images)
+#
+# This specification validates SWE-bench Pro datapoints using pre-built
+# Docker images from DockerHub (jefzda/sweap-images).
+#
+# Validation Steps:
+# 1. Verifying pass_to_pass tests pass initially
+# 2. Applying test patch
+# 3. Verifying fail_to_pass tests fail before fix
+# 4. Applying gold patch
+# 5. Verifying all tests pass after fix
+#
+# Prerequisites:
+#   - Pre-built Docker images available on DockerHub (automatically pulled)
+#   - Dataset with gold patches and test information
+#
+# Usage:
+#   ee-bench --config specs/python/swe-bench-pro-validation.yaml \
+#     --set instance_ids=django__django-11099 \
+#     run-evaluation
+
+version: "1.0"
+spec: python
+name: "Validate SWE-bench Pro datapoints"
+tags:
+  - python
+  - swe-bench-pro
+  - validation
+
+metadata:
+  author: "EE-Bench"
+  dataset: "SWE-bench Pro"
+
+# Dataset configuration
+dataset:
+  source:
+    type: "hf"
+    format: "csv"
+    # Load entire dataset using datasets library (no specific file needed)
+    path: "ScaleAI/SWE-bench_Pro"
+    split: "test"
+    token: "{{ env.HF_DPAIA_TOKEN }}"
+
+  cache: true
+
+  filters:
+    instance_ids: "{{ instance_ids | default([]) }}"
+
+# Environment configuration
+environment:
+  sandbox:
+    type: docker
+
+    docker:
+      cache: true
+      network: bridge
+
+  workspace_dir: "/app"
+  project_dir: "/app"
+
+  image: "{{ image_registry | default('jefzda/sweap-images') }}:{{ instance.docker_image_tag }}"
+
+  # Clone SWE-bench Pro harness repo for test execution scripts
+  configurers:
+    - name: swe_harness_checkout
+      type: git_checkout
+      options:
+        url: "https://github.com/scaleapi/SWE-bench_Pro-os"
+        base_commit: "main"
+        target_dir: "{{ env_config.workspace_dir}}/.swe-harness"
+
+# Evaluation configuration
+evaluations:
+  - id: validation
+    name: Validate datapoint
+
+    evaluators:
+      - name: project_reset
+        description: "Reset project to original state"
+        type: project_reset
+        is_terminal: false
+        max_score: 0
+        timeout: 200
+
+      - name: pass_to_pass_validation
+        description: "Validate pass_to_pass tests pass initially"
+        type: swe_harness__test_runner
+        is_terminal: false
+        max_score: 0
+        timeout: 600
+        options:
+          harness_dir: "{{ env_config.workspace_dir}}/.swe-harness"
+          tests: "{{ instance.pass_to_pass }}"
+          expect_pass: true
+
+      - name: test_patch_application
+        description: "Apply test patch from dataset"
+        type: patch_application
+        is_terminal: false
+        options:
+          patch: "{{ instance.test_patch }}"
+          can_skip_patch: true
+
+      - name: fail_to_pass_validation
+        description: "Validate fail_to_pass tests fail before fix"
+        type: swe_harness__test_runner
+        is_terminal: true
+        max_score: 0
+        timeout: 600
+        options:
+          harness_dir: "{{ env_config.workspace_dir}}/.swe-harness"
+          tests: "{{ instance.fail_to_pass }}"
+          expect_pass: false
+
+      - name: project_reset_before_gold
+        description: "Reset project before applying gold patch"
+        type: project_reset
+        is_terminal: false
+        max_score: 0
+        timeout: 200
+
+      - name: apply_gold_patch
+        description: "Apply gold patch to project"
+        type: patch_application
+        is_terminal: true
+        options:
+          patch: "{{ instance.patch }}"
+          can_skip_patch: true
+
+      - name: test_patch_reapplication
+        description: "Re-apply test patch after gold patch"
+        type: patch_application
+        is_terminal: false
+        options:
+          patch: "{{ instance.test_patch }}"
+          can_skip_patch: true
+
+      - name: all_tests_validation
+        description: "Validate all tests pass after gold patch"
+        type: swe_harness__test_runner
+        is_terminal: true
+        timeout: 600
+        options:
+          harness_dir: "{{ env_config.workspace_dir}}/.swe-harness"
+          tests: "{{ instance.all_tests }}"
+          expect_pass: true
+
+    # Execution options
+    parallel: true
+    max_workers: 4
+    timeout: 3600
+    fail_fast: true
+
+    # Scoring configuration
+    scoring:
+      method: weighted_sum
+      weights:
+        all_tests_validation: 1.0
+      normalize: true
+      aggregation: mean
+
+    # Output configuration
+    output:
+      path: result/{{ instance.instance_id }}/validation-{{ run_id }}.json
+      format: json
+      pretty: true
+
+# Log configuration
+log:
+  verbose: true
+  quiet: false
+  log_file: logs/python-validation.log
+
+options:
+  image_registry: "jefzda/sweap-images"

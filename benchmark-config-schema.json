@@ -14,7 +14,7 @@
     "spec": {
       "type": "string",
       "description": "Evaluation specification type to use (e.g., 'jvm', 'python')",
-      "examples": ["jvm", "python"]
+      "examples": ["jvm", "python", "intellij-ultimate"]
     },
     "name": {
       "type": "string",
@@ -1082,7 +1082,10 @@
             "agents",
             "docker_image",
             "bash_command",
-            "docker_in_docker"
+            "docker_in_docker",
+            "intellij_ultimate__jdk",
+            "intellij_ultimate__build",
+            "intellij_ultimate__artifact"
           ]
         },
         "enabled": {
@@ -1662,7 +1665,8 @@
             "patch_application",
             "prediction_application",
             "regression_detection",
-            "agent_evaluator"
+            "agent_evaluator",
+            "intellij_ultimate__validate_patch"
           ]
         },
         "description": {

@@ -1,0 +1,154 @@
+# SWE-bench Pro Prediction Collection
+#
+# This specification collects predictions from AI agents for SWE-bench Pro instances
+# using pre-built Docker images from DockerHub.
+#
+# Usage:
+#   ee-bench --config specs/python/swe-bench-pro-predictions.yaml --spec python run-evaluation
+
+version: "1.0"
+spec: python
+name: "Collect agent predictions for SWE-bench Pro"
+tags:
+  - python
+  - swe-bench-pro
+  - predictions
+
+metadata:
+  author: "EE-Bench"
+  dataset: "SWE-bench Pro"
+
+# Agent configuration - define one or more agents
+agents:
+  # Primary agent
+  - name: "{{ agent }}"
+    description: "CLI agent"
+    version: "latest"
+    primary: true  # Mark as primary agent
+    timeout: 1800
+
+    features:
+      telemetry:
+        enabled: true
+        bridge: true
+        log_prompts: true
+
+    dependencies:
+      - name: "langfuse-telemetry-bridge"
+        options:
+          host: "$LANGFUSE_HOST"
+          private_key: "$LANGFUSE_SECRET_KEY"
+          public_key: "$LANGFUSE_PUBLIC_KEY"
+          name: "{{ instance.instance_id }}"
+          tags:
+            - "swe-bench-pro"
+            - "python"
+            - "{{ agent }}"
+            - "{{ instance.instance_id }}"
+            - "{{ instance.repo }}"
+          metadata:
+            instance_id: "{{ instance.instance_id }}"
+            agent: "{{ agent }}"
+            repo: "{{ instance.repo }}"
+            base_commit: "{{ instance.base_commit }}"
+            problem_statement: "{{ instance.problem_statement }}"
+            hints_text: "{{ instance.hints_text }}"
+            created_at: "{{ instance.created_at }}"
+
+# Dataset configuration
+dataset:
+  source:
+    type: "hf"
+    format: "csv"
+    # HuggingFace dataset path: org/repo/file
+    path: "ScaleAI/SWE-bench_Pro/test.csv"
+    token: "{{ env.HF_DPAIA_TOKEN }}"
+
+  # Dataset options
+  cache: true
+
+# Environment configuration
+environment:
+  # Sandbox configuration
+  sandbox:
+    type: docker          # docker or local
+
+    docker:
+      privileged: true
+      cache: true
+      network: bridge
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+
+    # Sandbox environment variables (shared across docker/local)
+    env:
+      TZ: "UTC"
+      LANGFUSE_HOST: "{{ env.LANGFUSE_HOST }}"
+      LANGFUSE_SECRET_KEY: "{{ env.LANGFUSE_SECRET_KEY }}"
+      LANGFUSE_PUBLIC_KEY: "{{ env.LANGFUSE_PUBLIC_KEY }}"
+
+  # Workspace directory
+  workspace_dir: "/workspace"
+  project_dir: "/workspace/task_project"
+
+  # Use pre-built SWE-bench Pro Docker image from DockerHub
+  # Official images: https://hub.docker.com/r/jefzda/sweap-images
+  image: "{{ image_registry | default('jefzda/sweap-images') }}:{{ instance.environment_setup_commit }}"
+
+  # Build options
+  parallel: true          # Build environments in parallel
+  max_workers: 8          # Number of parallel workers
+
+  # Environment configurers
+  configurers:
+    - name: "Configure agent"
+      type: agents
+      image:
+        build: true
+        force: true
+        name: "{{ instance.instance_id }}:{{ agent }}"
+      options:
+        agents: "{{ agent }}"
+
+predictions:
+  - id: blind
+    name: Agent Blind Prediction
+    source: agent-code
+    agent: "{{ agent }}"
+    prompt: |
+      Fix the following issue by making code changes.
+
+      Problem Statement:
+      {{ instance.problem_statement }}
+
+    output:
+      path: result/{{ instance.instance_id }}/{{ agent }}-blind-predictions.json
+      pretty: true
+
+  - id: informed
+    name: Agent Informed Prediction
+    source: agent-test
+    agent: "{{ agent }}"
+    prompt: |
+      Fix the following issue by making code changes. You have access to test information.
+
+      Problem Statement:
+      {{ instance.problem_statement }}
+
+      Hints:
+      {{ instance.hints_text }}
+
+    output:
+      path: result/{{ instance.instance_id }}/{{ agent }}-informed-predictions.json
+      pretty: true
+
+# Log configuration (Logging)
+log:
+  # Logging options
+  verbose: true                # Verbose output mode
+  quiet: false                 # Minimal output mode
+  log_file: logs/log.log       # Log file path
+
+options:
+  agent: "claude-code"
+  image_registry: "jefzda/sweap-images"
