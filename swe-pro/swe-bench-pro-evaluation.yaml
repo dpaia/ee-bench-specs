@@ -141,6 +141,13 @@ evaluations:
           patch: "{{ instance.test_patch }}"
           can_skip_patch: true
 
+      - name: before_repo_set
+        description: "Execute before_repo_set_cmd from dataset (e.g. checkout test fixtures from fix commit)"
+        type: swe_harness__before_repo_set
+        is_terminal: false
+        max_score: 0
+        timeout: 120
+
       - name: all_tests_validation
         description: "Validate target tests pass"
         type: swe_harness__test_runner
@@ -238,6 +245,13 @@ evaluations:
         options:
           patch: "{{ prediction_patch }}"
           can_skip_patch: true
+
+      - name: before_repo_set
+        description: "Execute before_repo_set_cmd from dataset (e.g. checkout test fixtures from fix commit)"
+        type: swe_harness__before_repo_set
+        is_terminal: false
+        max_score: 0
+        timeout: 120
 
       - name: all_tests_validation
         description: "Validate target tests pass"
