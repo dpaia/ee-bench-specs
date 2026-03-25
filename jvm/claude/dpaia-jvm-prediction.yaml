@@ -127,6 +127,8 @@ predictions:
 
       Problem Statement:
       {{ instance.problem_statement }}
+      
+      Before executing the task, evaluate all available skills and leverage them as needed.
 
     output:
       path: result/{{ instance.instance_id }}/{{ agent }}-blind-predictions.json
@@ -147,6 +149,8 @@ predictions:
 
       Tests that must continue passing:
       {{ instance.pass_to_pass }}
+      
+      Before executing the task, evaluate all available skills and leverage them as needed.
 
     output:
       path: result/{{ instance.instance_id }}/{{ agent }}-informed-predictions.json
