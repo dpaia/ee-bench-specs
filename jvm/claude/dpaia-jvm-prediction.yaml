@@ -128,7 +128,7 @@ predictions:
       Problem Statement:
       {{ instance.problem_statement }}
       
-      Before starting, you must review all available skills and use every single one of them without exception.
+      {{ env.PROMPT_ADDITION }}
 
     output:
       path: result/{{ instance.instance_id }}/{{ agent }}-blind-predictions.json
@@ -150,7 +150,7 @@ predictions:
       Tests that must continue passing:
       {{ instance.pass_to_pass }}
       
-      Before starting, you must review all available skills and use every single one of them without exception.
+      {{ env.PROMPT_ADDITION }}
 
     output:
       path: result/{{ instance.instance_id }}/{{ agent }}-informed-predictions.json
