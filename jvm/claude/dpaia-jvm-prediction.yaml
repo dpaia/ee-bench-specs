@@ -25,6 +25,9 @@ agents:
     primary: true  # Mark as primary agent
     timeout: 1800
 
+    env:
+      CLAUDE_CODE_VERSION: "{{ env.CLAUDE_CODE_VERSION }}"
+
     features:
       # Telemetry configuration
       telemetry:
