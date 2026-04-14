@@ -109,6 +109,15 @@ environment:
   parallel: true          # Build environments in parallel
   max_workers: 8          # Number of parallel workers
 
+  hooks:
+    post:
+      - name: collect_transcript
+        type: collect_artifacts
+        options:
+          paths:
+            - "/workspace/transcript/**"
+          destination: "{{ instance.instance_id }}/transcript"
+
   # Environment configurers
   configurers:
     - name: "Configure agent"
