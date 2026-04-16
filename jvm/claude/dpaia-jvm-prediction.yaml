@@ -61,6 +61,7 @@ agents:
             version: "{{ instance.version }}"
             language: "{{ instance.language }}"
             build_system: "{{ instance.build_system }}"
+            trace_id: "{{ env.LANGFUSE_TRACE_ID | default('No id specified') }}"
 
 # Dataset configuration
 dataset:
