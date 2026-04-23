@@ -48,6 +48,7 @@ agents:
             - "{{ instance.instance_id }}"
             - "{{ instance.build_system }}"
             - "{{ instance.language }}"
+            - "{{ env.LANGFUSE_TRACE_ID | default('No id specified') }}"
           metadata:
             instance_id: "{{ instance.instance_id }}"
             agent: "{{ agent }}"
