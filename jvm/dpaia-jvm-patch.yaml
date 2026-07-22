@@ -1,0 +1,108 @@
+# Complete YAML Configuration Example
+#
+# This example demonstrates all available configuration options
+# for the ee-bench YAML configuration system.
+#
+# Usage:
+#   ee-bench --config examples/yaml-configs/complete.yaml --spec jvm run-evaluation
+
+version: "1.0"
+spec: jvm
+name: "Collect agent predictions for DPAIA benchmark"
+tags:
+  - jvm
+  - predictions
+
+metadata:
+  author: "DPAIA"
+
+# Agent configuration - define one or more agents
+agents:
+  # Primary agent
+  - name: "patch-agent"
+    description: "Patch agent"
+    version: "latest"
+    primary: true  # Mark as primary agent
+    timeout: 1800
+    options:
+      patch_path: "~/steroid-output/agent-result.patch"
+
+# Dataset configuration
+dataset:
+  source:
+    type: "http"
+    format: "json"
+    uri: "{{ dataset_uri }}"
+
+  # Dataset options
+  cache: true
+
+# Environment configuration
+environment:
+  # Load pre-configured environment (optional)
+  # config_path: environment-config.json
+
+  # Sandbox configuration
+  sandbox:
+    type: docker          # docker or local
+
+    docker:
+      privileged: true
+      cache: true
+      network: bridge
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+
+    # Sandbox environment variables (shared across docker/local)
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+      TESTCONTAINERS_CHECKS_DISABLE: "true"
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+      TZ: "UTC"
+
+  # Workspace directory
+  workspace_dir: "/workspace"
+  project_dir: "/workspace/task_project"
+
+  # Docker image configuration (simple format)
+  image: "{{ instance.instance_id }}:dependencies"
+
+  # Build options
+  parallel: true          # Build environments in parallel
+  max_workers: 8          # Number of parallel workers
+
+  # Environment configurers
+  configurers:
+    - name: "Configure agent"
+      type: agents
+      image:
+        build: true
+        force: true
+        name: "{{ instance.instance_id }}:patch-agent"
+      options:
+        agents: "patch-agent"
+
+predictions:
+  - id: blind
+    name: Agent Blind Prediction
+    source: agent-code
+    agent: "patch-agent"
+    prompt: |
+      Fix the following issue by making code changes.
+
+      Problem Statement:
+      {{ instance.problem_statement }}
+
+    output:
+      path: result/{{ instance.instance_id }}/patch-agent-blind-predictions.json
+      pretty: true
+
+# Log configuration (Logging)
+log:
+  # Logging options
+  verbose: true                # Verbose output mode
+  quiet: false                 # Minimal output mode
+  log_file: logs/log.log       # Log file path
+
+options:
+  dataset_uri: "https://raw.githubusercontent.com/dpaia/ee-dataset/refs/tags/{{ dataset_version | default('v20251028') }}/datasets/java-spring-ee-dataset.json"
